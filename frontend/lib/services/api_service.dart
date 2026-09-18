@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000/api/v1';
+  // Local Mac IP address for physical phone testing (192.168.31.193)
+  static const String baseUrl = 'http://192.168.31.193:8000/api/v1';
+
 
   static final Map<String, String> userTokens = {
     'driver1': 'mock-token-driver1@sode-edu.in',
