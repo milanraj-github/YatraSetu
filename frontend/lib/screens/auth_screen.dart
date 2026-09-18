@@ -144,49 +144,27 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Quick Preset Identity Switcher Card
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF334155)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Demo Preset Account Selector:',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedRoleKey,
-                          dropdownColor: const Color(0xFF1E293B),
-                          isExpanded: true,
-                          items: users.entries.map((entry) {
-                            return DropdownMenuItem<String>(
-                              value: entry.key,
-                              child: Text(
-                                '${entry.value['name']} (${entry.value['role']}) - ${entry.value['email']}',
-                                style: const TextStyle(color: Color(0xFF34D399), fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                selectedRoleKey = val;
-                                _emailController.text = users[val]!['email']!;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                // 3 Explicit Account Type Role Selector Tabs (Driver, Student, Admin)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select Login Account Type:',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _roleTabButton('Driver 🚌', 'driver1', const Color(0xFF10B981)),
+                        const SizedBox(width: 8),
+                        _roleTabButton('Student 🎓', 'student1', const Color(0xFF38BDF8)),
+                        const SizedBox(width: 8),
+                        _roleTabButton('Admin 🛡️', 'admin1', const Color(0xFFF59E0B)),
+                      ],
+                    ),
+                  ],
                 ),
+
 
                 const SizedBox(height: 20),
 
@@ -342,7 +320,42 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Widget _roleTabButton(String title, String roleKey, Color color) {
+    final isSelected = selectedRoleKey == roleKey;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedRoleKey = roleKey;
+            _emailController.text = users[roleKey]!['email']!;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.2) : const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? color : const Color(0xFF334155),
+              width: isSelected ? 2.0 : 1.0,
+            ),
+          ),
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _inputField(String label, TextEditingController controller, IconData icon, {bool obscureText = false}) {
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

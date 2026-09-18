@@ -27,8 +27,14 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-  }
 
+    // Auto-navigate to Auth Screen after 2.5 seconds intro animation
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        _navigateToAuth();
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -156,39 +162,11 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
 
                 const Spacer(),
-
-                // Get Started Launch Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _navigateToAuth,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: const Color(0xFF0F172A),
-                        elevation: 12,
-                        shadowColor: const Color(0xFF10B981).withOpacity(0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Launch Dashboard',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(Icons.arrow_forward_rounded, size: 20),
-                        ],
-                      ),
-                    ),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 32.0),
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF10B981),
+                    strokeWidth: 3,
                   ),
                 ),
               ],
@@ -199,3 +177,4 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 }
+
