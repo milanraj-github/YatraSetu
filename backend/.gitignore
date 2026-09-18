@@ -1,0 +1,30 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables & secrets
+.env
+*.env
+firebase-service-account.json
+firebase-credentials.json
+*.pem
+*.key
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database & IDE
+*.sqlite
+*.db
+.idea/
+.vscode/
+.DS_Store

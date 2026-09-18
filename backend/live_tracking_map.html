@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SMARTBUS Live Tracking Map</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- Leaflet CSS & JS for OpenStreetMap visual rendering -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map { height: 420px; width: 100%; border-radius: 0.75rem; }
+  </style>
+</head>
+<body class="bg-transparent text-[var(--foreground)] antialiased p-3">
+  <div class="bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] rounded-2xl p-4 shadow-md max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-[var(--border)]">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1.5"></span> LIVE DRIVER GPS
+          </span>
+          <h2 class="text-lg font-bold text-[var(--foreground)]">BUS-01 — Real-Time Campus Map</h2>
+        </div>
+        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">Auto-Polling Backend (`/api/v1/tracking/active-buses`) Every 2 Seconds</p>
+      </div>
+      <div class="text-xs text-[var(--muted-foreground)] bg-[var(--background)] px-3 py-1.5 rounded-lg border border-[var(--border)]">
+        Status: <span id="syncStatus" class="text-emerald-500 font-semibold">Live Polling Active</span>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Stats Bar -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div class="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+        <p class="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">Bus Status</p>
+        <p id="statStatus" class="text-sm font-bold text-emerald-500 mt-0.5">IN TRIP</p>
+      </div>
+      <div class="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+        <p class="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">Current Speed</p>
+        <p id="statSpeed" class="text-sm font-bold text-[var(--foreground)] mt-0.5">38 km/h</p>
+      </div>
+      <div class="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+        <p class="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">Next Stop</p>
+        <p id="statNextStop" class="text-sm font-bold text-[var(--foreground)] mt-0.5">Kalsanka</p>
+      </div>
+      <div class="p-2.5 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+        <p class="text-[10px] text-[var(--muted-foreground)] uppercase font-semibold">Driver Name</p>
+        <p class="text-sm font-bold text-[var(--foreground)] mt-0.5">Driver One</p>
+      </div>
+    </div>
+
+    <!-- Map Viewport -->
+    <div class="relative overflow-hidden rounded-xl border border-[var(--border)]">
+      <div id="map"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // Route Stops Coordinates (Udupi City to SMVITM Bantakal Campus)
+    const routePoints = [
+      { name: "1. Udupi Bus Stand", lat: 13.3418, lng: 74.7473 },
+      { name: "2. Kalsanka", lat: 13.3445, lng: 74.7540 },
+      { name: "3. Gundibail", lat: 13.3480, lng: 74.7610 },
+      { name: "4. Kunjibettu", lat: 13.3512, lng: 74.7690 },
+      { name: "5. Indrali", lat: 13.3550, lng: 74.7780 },
+      { name: "6. SMVITM Campus", lat: 13.2541, lng: 74.7865 }
+    ];
+
+    let map;
+    const busMarkers = {};
+    let pollInterval = null;
+
+    const busColors = {
+      'BUS-01': '#10b981', // Green
+      'BUS-02': '#3b82f6', // Blue
+      'BUS-03': '#f59e0b'  // Amber
+    };
+
+    function createBusIcon(busNumber) {
+      const color = busColors[busNumber] || '#10b981';
+      return L.divIcon({
+        html: `
+          <div style="background: ${color}; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); color: white; font-weight: bold; font-size: 16px;">
+            🚌
+          </div>
+        `,
+        className: '',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+    }
+
+    function initMap() {
+      map = L.map('map').setView([13.3000, 74.7600], 12);
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      // Start automatic multi-bus backend polling every 2 seconds
+      startBackendLivePolling();
+    }
+
+    async function fetchLiveBusLocation() {
+      try {
+        const response = await fetch('http://localhost:8000/api/v1/tracking/active-buses', {
+          headers: {
+            'Authorization': 'Bearer mock-token-student1@sode-edu.in',
+            'Accept': 'application/json'
+          }
+        });
+        const result = await response.json();
+
+        if (result.success && result.data && result.data.length > 0) {
+          let activeCount = 0;
+
+          result.data.forEach(bus => {
+            if (bus.location && Math.abs(bus.location.latitude) > 0.001 && Math.abs(bus.location.longitude) > 0.001 && bus.location.latitude > 0) {
+              activeCount++;
+              const lat = bus.location.latitude;
+              const lng = bus.location.longitude;
+              const speed = bus.location.speed || 0;
+              const heading = bus.location.heading || 0;
+              const updatedAt = new Date(bus.location.updated_at || bus.location.recorded_at).toLocaleTimeString();
+
+              if (!busMarkers[bus.bus_number]) {
+                busMarkers[bus.bus_number] = L.marker([lat, lng], { icon: createBusIcon(bus.bus_number) }).addTo(map);
+              } else {
+                busMarkers[bus.bus_number].setLatLng([lat, lng]);
+              }
+
+              busMarkers[bus.bus_number].bindPopup(`
+                <div style="font-size: 13px;">
+                  <b>${bus.bus_number} (${bus.registration_number})</b><br>
+                  Driver: ${bus.driver_name}<br>
+                  Speed: ${speed} km/h | Heading: ${heading}°<br>
+                  <span style="color: #10b981; font-weight: bold;">● LIVE (${updatedAt})</span>
+                </div>
+              `);
+            }
+          });
+
+          const liveBus = result.data.find(b => b.location !== null) || result.data[0];
+          if (liveBus && liveBus.location) {
+            document.getElementById("statStatus").innerText = `${activeCount} BUS(ES) LIVE`;
+            document.getElementById("statSpeed").innerText = `${liveBus.location.speed || 0} km/h`;
+            document.getElementById("statNextStop").innerText = liveBus.bus_number;
+          }
+        }
+      } catch (err) {
+        console.error("Error polling backend live bus location:", err);
+      }
+    }
+
+    function startBackendLivePolling() {
+      fetchLiveBusLocation();
+      if (!pollInterval) {
+        pollInterval = setInterval(fetchLiveBusLocation, 2000);
+      }
+    }
+
+    function toggleSimulation() {
+      fetchLiveBusLocation();
+    }
+
+    function resetSimulation() {
+      fetchLiveBusLocation();
+    }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
