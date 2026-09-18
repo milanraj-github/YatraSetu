@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YatraSetu / SMARTBUS Dashboard</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map { height: 460px; width: 100%; border-radius: 0.75rem; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 antialiased font-sans min-h-screen p-4 md:p-6">
+
+  <!-- Main Container -->
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Header & Navigation -->
+    <header class="bg-slate-800/90 backdrop-blur border border-slate-700/80 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl">
+          🚌
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold text-white tracking-tight">YatraSetu / SMARTBUS</h1>
+          <p class="text-xs text-slate-400">Phase 1 & 2 Interactive Dashboard (Auth + Live GPS Tracking)</p>
+        </div>
+      </div>
+
+      <!-- Identity Switcher & Status -->
+      <div class="flex items-center gap-3 w-full md:w-auto">
+        <div class="bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-1.5 text-xs flex items-center gap-2">
+          <span class="text-slate-400">Current Role:</span>
+          <span id="activeRoleBadge" class="font-bold text-emerald-400 uppercase">DRIVER</span>
+        </div>
+        <select id="userSelector" onchange="switchUser(this.value)" class="bg-slate-700 border border-slate-600 text-white text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 transition">
+          <option value="driver1">Driver One (BUS-01)</option>
+          <option value="driver2">Driver Two (BUS-02)</option>
+          <option value="driver3">Driver Three (BUS-03)</option>
+          <option value="student1">Student (student1@sode-edu.in)</option>
+          <option value="admin1">Admin (admin1@sode-edu.in)</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="flex gap-2 border-b border-slate-700/80 pb-2">
+      <button id="tabBtnMap" onclick="switchTab('map')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow">
+        🗺️ Live Campus Map
+      </button>
+      <button id="tabBtnDriver" onclick="switchTab('driver')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+        📡 Driver GPS Controls
+      </button>
+      <button id="tabBtnAuth" onclick="switchTab('auth')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+        🔑 Auth & Identity Verification
+      </button>
+    </div>
+
+    <!-- TAB 1: Live Campus Map -->
+    <div id="tabContentMap" class="space-y-4">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl shadow">
+          <p class="text-[10px] uppercase font-bold text-slate-400">Active Campus Buses</p>
+          <p id="statActiveCount" class="text-lg font-black text-emerald-400 mt-0.5">3 BUSES</p>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl shadow">
+          <p class="text-[10px] uppercase font-bold text-slate-400">Live Polling Status</p>
+          <p id="statPollingStatus" class="text-xs font-bold text-emerald-400 mt-1">● 2s Refresh Active</p>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl shadow">
+          <p class="text-[10px] uppercase font-bold text-slate-400">Selected Bus Speed</p>
+          <p id="statSelectedSpeed" class="text-lg font-black text-white mt-0.5">0 km/h</p>
+        </div>
+        <div class="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl shadow">
+          <p class="text-[10px] uppercase font-bold text-slate-400">Last Telemetry Sync</p>
+          <p id="statLastSync" class="text-xs font-bold text-slate-300 mt-1">--:--:--</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/90 border border-slate-700/80 p-3 rounded-2xl shadow-xl relative">
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Driver GPS Controls -->
+    <div id="tabContentDriver" class="hidden space-y-4">
+      <div class="bg-slate-800/90 border border-slate-700/80 p-5 rounded-2xl shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-white">Driver Location Transmitter</h2>
+            <p class="text-xs text-slate-400">Simulate or push live hardware GPS coordinates from Driver app to backend</p>
+          </div>
+          <button id="autoDriveBtn" onclick="toggleAutoDrive()" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow transition">
+            ▶ Start Driving Route
+          </button>
+        </div>
+
+        <!-- Driver Assignment Card -->
+        <div id="driverStatusCard" class="bg-slate-900/80 border border-slate-700/70 p-4 rounded-xl text-xs text-slate-300 space-y-1">
+          <p class="font-bold text-emerald-400">Assigned Bus: BUS-01 (KA-20-F-1001)</p>
+          <p>Driver Email: <span id="drvEmail">driver1@sode-edu.in</span></p>
+          <p>Route: Udupi City Route $\rightarrow$ SMVITM Campus</p>
+        </div>
+
+        <!-- Ingest Controls Form -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="text-xs font-bold text-slate-400 block mb-1">Latitude</label>
+            <input id="inputLat" type="number" step="0.0001" value="13.3418" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-400 block mb-1">Longitude</label>
+            <input id="inputLng" type="number" step="0.0001" value="74.7473" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-400 block mb-1">Speed (km/h)</label>
+            <input id="inputSpeed" type="number" step="1" value="35" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:ring-2 focus:ring-emerald-500">
+          </div>
+        </div>
+
+        <button onclick="sendManualPing()" class="w-full py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white transition shadow">
+          🚀 Send Live GPS Ping (POST /api/v1/gps/ingest)
+        </button>
+
+        <div id="pingLog" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-emerald-400 max-h-32 overflow-y-auto">
+          > Ready to transmit GPS location pings...
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Auth & Identity Verification -->
+    <div id="tabContentAuth" class="hidden space-y-4">
+      <div class="bg-slate-800/90 border border-slate-700/80 p-5 rounded-2xl shadow-xl space-y-4">
+        <h2 class="text-base font-bold text-white border-b border-slate-700/80 pb-3">Role & Token Security Verifier</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <button onclick="testAuthEndpoint('/api/v1/auth/student-only')" class="p-3 bg-slate-900 hover:bg-slate-700/50 border border-slate-700 rounded-xl text-left transition">
+            <p class="text-xs font-bold text-emerald-400">Test Student Endpoint</p>
+            <p class="text-[10px] text-slate-400">GET /api/v1/auth/student-only</p>
+          </button>
+          <button onclick="testAuthEndpoint('/api/v1/auth/driver-only')" class="p-3 bg-slate-900 hover:bg-slate-700/50 border border-slate-700 rounded-xl text-left transition">
+            <p class="text-xs font-bold text-blue-400">Test Driver Endpoint</p>
+            <p class="text-[10px] text-slate-400">GET /api/v1/auth/driver-only</p>
+          </button>
+          <button onclick="testAuthEndpoint('/api/v1/auth/admin-only')" class="p-3 bg-slate-900 hover:bg-slate-700/50 border border-slate-700 rounded-xl text-left transition">
+            <p class="text-xs font-bold text-amber-400">Test Admin Endpoint</p>
+            <p class="text-[10px] text-slate-400">GET /api/v1/auth/admin-only</p>
+          </button>
+        </div>
+
+        <div id="authResultBox" class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono text-slate-300">
+          Click any endpoint above to test role authorization...
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript App Engine -->
+  <script>
+    const userTokens = {
+      driver1: { token: 'mock-token-driver1@sode-edu.in', email: 'driver1@sode-edu.in', role: 'DRIVER', name: 'Driver One' },
+      driver2: { token: 'mock-token-driver2@sode-edu.in', email: 'driver2@sode-edu.in', role: 'DRIVER', name: 'Driver Two' },
+      driver3: { token: 'mock-token-driver3@sode-edu.in', email: 'driver3@sode-edu.in', role: 'DRIVER', name: 'Driver Three' },
+      student1: { token: 'mock-token-student1@sode-edu.in', email: 'student1@sode-edu.in', role: 'STUDENT', name: 'Student One' },
+      admin1: { token: 'mock-token-admin1@sode-edu.in', email: 'admin1@sode-edu.in', role: 'ADMIN', name: 'Admin One' }
+    };
+
+    let currentUserKey = 'driver1';
+    let map, pollInterval;
+    const busMarkers = {};
+
+    const busColors = {
+      'BUS-01': '#10b981', // Emerald
+      'BUS-02': '#3b82f6', // Blue
+      'BUS-03': '#f59e0b'  // Amber
+    };
+
+    const routePoints = [
+      { name: "Udupi Stand", lat: 13.3418, lng: 74.7473 },
+      { name: "Kalsanka", lat: 13.3445, lng: 74.7540 },
+      { name: "Gundibail", lat: 13.3480, lng: 74.7610 },
+      { name: "Kunjibettu", lat: 13.3512, lng: 74.7690 },
+      { name: "Indrali", lat: 13.3550, lng: 74.7780 },
+      { name: "SMVITM Campus", lat: 13.2541, lng: 74.7865 }
+    ];
+
+    let autoDriveIndex = 0;
+    let autoDriveInterval = null;
+
+    function createBusIcon(busNumber) {
+      const color = busColors[busNumber] || '#10b981';
+      return L.divIcon({
+        html: `<div style="background: ${color}; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); color: white; font-weight: bold; font-size: 16px;">🚌</div>`,
+        className: '',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+    }
+
+    function initMap() {
+      if (map) return;
+      map = L.map('map').setView([13.3000, 74.7600], 12);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      startPolling();
+    }
+
+    async function pollCampusBuses() {
+      try {
+        const u = userTokens[currentUserKey];
+        const res = await fetch('/api/v1/tracking/active-buses', {
+          headers: { 'Authorization': `Bearer ${u.token}` }
+        });
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          let liveCount = 0;
+          let topSpeed = 0;
+
+          data.data.forEach(bus => {
+            if (bus.location && bus.location.latitude > 0) {
+              liveCount++;
+              const lat = bus.location.latitude;
+              const lng = bus.location.longitude;
+              const speed = bus.location.speed || 0;
+              if (speed > topSpeed) topSpeed = speed;
+
+              if (!busMarkers[bus.bus_number]) {
+                busMarkers[bus.bus_number] = L.marker([lat, lng], { icon: createBusIcon(bus.bus_number) }).addTo(map);
+              } else {
+                busMarkers[bus.bus_number].setLatLng([lat, lng]);
+              }
+
+              busMarkers[bus.bus_number].bindPopup(`
+                <div style="font-size: 12px; font-family: sans-serif;">
+                  <b>${bus.bus_number} (${bus.registration_number})</b><br>
+                  Driver: ${bus.driver_name}<br>
+                  Speed: ${speed} km/h<br>
+                  <span style="color: #10b981; font-weight: bold;">● LIVE</span>
+                </div>
+              `);
+            }
+          });
+
+          document.getElementById('statActiveCount').innerText = `${data.data.length} BUSES`;
+          document.getElementById('statSelectedSpeed').innerText = `${topSpeed} km/h`;
+          document.getElementById('statLastSync').innerText = new Date().toLocaleTimeString();
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }
+
+    function startPolling() {
+      pollCampusBuses();
+      if (!pollInterval) {
+        pollInterval = setInterval(pollCampusBuses, 2000);
+      }
+    }
+
+    function switchUser(key) {
+      currentUserKey = key;
+      const u = userTokens[key];
+      document.getElementById('activeRoleBadge').innerText = u.role;
+      document.getElementById('drvEmail').innerText = u.email;
+
+      // Sync user identity with backend
+      fetch('/api/v1/auth/sync-user', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${u.token}` }
+      }).catch(err => console.log(err));
+
+      pollCampusBuses();
+    }
+
+    function switchTab(tab) {
+      ['Map', 'Driver', 'Auth'].forEach(t => {
+        const content = document.getElementById(`tabContent${t}`);
+        const btn = document.getElementById(`tabBtn${t}`);
+        if (t.toLowerCase() === tab) {
+          content.classList.remove('hidden');
+          btn.className = "px-4 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow";
+        } else {
+          content.classList.add('hidden');
+          btn.className = "px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700";
+        }
+      });
+      if (tab === 'map') initMap();
+    }
+
+    async function sendManualPing() {
+      const u = userTokens[currentUserKey];
+      const lat = parseFloat(document.getElementById('inputLat').value);
+      const lng = parseFloat(document.getElementById('inputLng').value);
+      const speed = parseFloat(document.getElementById('inputSpeed').value);
+
+      const payload = {
+        latitude: lat,
+        longitude: lng,
+        speed: speed,
+        heading: 90.0,
+        accuracy: 3.0,
+        recorded_at: new Date().toISOString()
+      };
+
+      try {
+        const res = await fetch('/api/v1/gps/ingest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${u.token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        const logBox = document.getElementById('pingLog');
+        logBox.innerHTML = `> [${new Date().toLocaleTimeString()}] Ping Sent (${lat}, ${lng}, ${speed}km/h) -> Response: ${JSON.stringify(result)}<br>` + logBox.innerHTML;
+        pollCampusBuses();
+      } catch (err) {
+        alert("Error sending ping: " + err);
+      }
+    }
+
+    function toggleAutoDrive() {
+      const btn = document.getElementById('autoDriveBtn');
+      if (autoDriveInterval) {
+        clearInterval(autoDriveInterval);
+        autoDriveInterval = null;
+        btn.innerText = "▶ Start Driving Route";
+        btn.className = "px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow transition";
+      } else {
+        btn.innerText = "⏸ Pause Driving Route";
+        btn.className = "px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow transition";
+        autoDriveInterval = setInterval(() => {
+          const pt = routePoints[autoDriveIndex];
+          document.getElementById('inputLat').value = pt.lat;
+          document.getElementById('inputLng').value = pt.lng;
+          sendManualPing();
+          autoDriveIndex = (autoDriveIndex + 1) % routePoints.length;
+        }, 2500);
+      }
+    }
+
+    async function testAuthEndpoint(url) {
+      const u = userTokens[currentUserKey];
+      try {
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${u.token}` }
+        });
+        const data = await res.json();
+        document.getElementById('authResultBox').innerHTML = `
+          <strong>Tested:</strong> ${url}<br>
+          <strong>User:</strong> ${u.name} (${u.role})<br>
+          <strong>HTTP Status:</strong> ${res.status}<br>
+          <strong>Response:</strong> <pre class="mt-2 text-emerald-400">${JSON.stringify(data, null, 2)}</pre>
+        `;
+      } catch (err) {
+        document.getElementById('authResultBox').innerHTML = `<span class="text-red-400">Error: ${err}</span>`;
+      }
+    }
+
+    window.onload = () => {
+      initMap();
+    };
+  </script>
+</body>
+</html>
