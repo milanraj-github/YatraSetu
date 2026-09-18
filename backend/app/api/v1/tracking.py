@@ -15,23 +15,33 @@ from app.models.user import User
 router = APIRouter(tags=["Tracking & Location"])
 
 async def get_db_user_from_auth(db: AsyncSession, auth_user: UserResponse) -> User:
-    """Helper to dynamically resolve DB User entity from authenticated Firebase identity."""
+    """
+    Resolves the full DB User record from the authenticated Firebase identity.
+    Raises HTTP 404 if the user has not been synced to the database yet.
+    Clients must call POST /auth/sync-user on first login.
+    """
     from sqlalchemy.future import select
-    stmt = select(User).where(User.email == auth_user.email)
+    from fastapi import HTTPException, status as http_status
+
+    stmt = select(User).where(User.firebase_uid == auth_user.firebase_uid)
     res = await db.execute(stmt)
     user = res.scalars().first()
+
     if not user:
-        stmt_uid = select(User).where(User.firebase_uid == auth_user.firebase_uid)
-        res_uid = await db.execute(stmt_uid)
-        user = res_uid.scalars().first()
+        # Fallback: try matching by email (handles legacy seeded accounts)
+        stmt_email = select(User).where(User.email == auth_user.email)
+        res_email = await db.execute(stmt_email)
+        user = res_email.scalars().first()
+
     if not user:
-        user = User(
-            id=4,  # Fallback to driver 1 if unseeded
-            firebase_uid=auth_user.firebase_uid,
-            email=auth_user.email,
-            full_name=auth_user.full_name,
-            role=auth_user.role
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "USER_NOT_FOUND_IN_DB",
+                "message": "User not found in database. Please call POST /api/v1/auth/sync-user first.",
+            }
         )
+
     return user
 
 @router.get("/driver/tracking/status", response_model=APIResponse[DriverTrackingStatusResponse])

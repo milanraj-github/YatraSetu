@@ -70,22 +70,28 @@ async def evaluate_scheduled_sessions_for_db(db: AsyncSession, target_datetime: 
         res_session = await db.execute(stmt_session)
         session = res_session.scalars().first()
 
-        # Always set session status to ACTIVE for 24/7 unconstrained tracking
-        is_during = True
-        is_past = False
-        is_before = False
+        # ── Correct time-window evaluation (Asia/Kolkata) ──────────────────────
+        # is_before : current time < schedule start_time  -> SCHEDULED
+        # is_during : start_time <= current time <= end_time  -> ACTIVE
+        # is_past   : current time > schedule end_time  -> COMPLETED
+        is_before = current_time < sched.start_time
+        is_past = current_time > sched.end_time
+        is_during = not is_before and not is_past
+        # ───────────────────────────────────────────────────────────────────────
 
         if not session:
-            # Create new daily instance
+            # Create a new daily instance at the correct initial status
             if is_during:
                 initial_status = SessionStatus.ACTIVE
                 started_at = now
                 ended_at = None
             elif is_past:
                 initial_status = SessionStatus.COMPLETED
-                started_at = datetime.combine(today_date, sched.start_time)
-                ended_at = datetime.combine(today_date, sched.end_time)
+                tz = pytz.timezone(settings.TIMEZONE)
+                started_at = tz.localize(datetime.combine(today_date, sched.start_time))
+                ended_at = tz.localize(datetime.combine(today_date, sched.end_time))
             else:
+                # is_before: window hasn't opened yet
                 initial_status = SessionStatus.SCHEDULED
                 started_at = None
                 ended_at = None
@@ -99,22 +105,28 @@ async def evaluate_scheduled_sessions_for_db(db: AsyncSession, target_datetime: 
                 direction=sched.direction,
                 status=initial_status,
                 started_at=started_at,
-                ended_at=ended_at
+                ended_at=ended_at,
             )
             db.add(session)
             await db.commit()
             await db.refresh(session)
-            logger.info(f"Created new tracking session ID {session.id} for Bus {sched.bus_id} ({sched.direction.value}) with status {initial_status.value}")
+            logger.info(
+                f"Created tracking session ID {session.id} for Bus {sched.bus_id} "
+                f"({sched.direction.value}) -> {initial_status.value}"
+            )
         else:
             # Transition existing session idempotently
             updated = False
+
             if session.status == SessionStatus.SCHEDULED and is_during:
+                # Window just opened - activate
                 session.status = SessionStatus.ACTIVE
                 session.started_at = now
                 updated = True
                 logger.info(f"Activated session ID {session.id} for Bus {sched.bus_id}")
 
             elif session.status in (SessionStatus.SCHEDULED, SessionStatus.ACTIVE) and is_past:
+                # Window has closed - complete
                 session.status = SessionStatus.COMPLETED
                 if not session.ended_at:
                     session.ended_at = now
@@ -125,7 +137,7 @@ async def evaluate_scheduled_sessions_for_db(db: AsyncSession, target_datetime: 
                 await db.commit()
                 await db.refresh(session)
 
-        # Update Bus status accordingly
+        # Sync Bus.status with session state
         stmt_bus = select(Bus).where(Bus.id == sched.bus_id)
         res_bus = await db.execute(stmt_bus)
         bus = res_bus.scalars().first()
@@ -133,7 +145,7 @@ async def evaluate_scheduled_sessions_for_db(db: AsyncSession, target_datetime: 
             if session.status == SessionStatus.ACTIVE and bus.status != BusStatus.IN_TRIP:
                 bus.status = BusStatus.IN_TRIP
                 await db.commit()
-            elif session.status == SessionStatus.COMPLETED and bus.status == BusStatus.IN_TRIP:
+            elif session.status in (SessionStatus.COMPLETED, SessionStatus.SCHEDULED) and bus.status == BusStatus.IN_TRIP:
                 bus.status = BusStatus.IDLE
                 await db.commit()
 

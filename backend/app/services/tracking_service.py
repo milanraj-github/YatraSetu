@@ -192,9 +192,17 @@ async def ingest_gps_ping(
     await db.commit()
     await db.refresh(db_ping)
 
-    # 5. Redis Latest Location Update (Always update to reflect latest live driver ping)
+    # 5. Redis Latest Location Update — only overwrite if this ping is newer
     redis_key = f"bus:{bus_id}:latest_location"
-    is_newer = True
+    existing = await get_redis_json(redis_key)
+
+    is_newer = True  # default: no existing data
+    if existing and existing.get("recorded_at"):
+        try:
+            existing_recorded_at = datetime.fromisoformat(existing["recorded_at"])
+            is_newer = recorded_at_naive > existing_recorded_at
+        except (ValueError, TypeError):
+            is_newer = True  # malformed value — overwrite
 
     if is_newer:
         redis_payload = {
@@ -207,22 +215,26 @@ async def ingest_gps_ping(
             "heading": ping_data.heading,
             "accuracy": ping_data.accuracy,
             "recorded_at": recorded_at_naive.isoformat(),
-            "updated_at": now_utc.isoformat()
+            "updated_at": now_utc.isoformat(),
         }
         await set_redis_json(redis_key, redis_payload, ttl=86400)
+        logger.debug(f"Redis updated for bus {bus_id} at {recorded_at_naive.isoformat()}")
+    else:
+        logger.debug(f"Skipping Redis update for bus {bus_id} — ping at {recorded_at_naive.isoformat()} is older than cached {existing['recorded_at']}")
 
     return {
         "synced": True,
         "trip_id": session.id,
         "bus_id": bus_id,
+        "redis_updated": is_newer,
         "location": {
             "latitude": ping_data.latitude,
             "longitude": ping_data.longitude,
             "speed": ping_data.speed,
             "heading": ping_data.heading,
             "accuracy": ping_data.accuracy,
-            "recorded_at": recorded_at_naive.isoformat()
-        }
+            "recorded_at": recorded_at_naive.isoformat(),
+        },
     }
 
 async def get_live_trip_location(db: AsyncSession, trip_id: int) -> LiveTripResponse:
