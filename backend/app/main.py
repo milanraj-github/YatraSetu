@@ -114,3 +114,10 @@ async def serve_live_map():
     map_path = os.path.join(os.path.dirname(__file__), "..", "live_tracking_map.html")
     return FileResponse(map_path)
 
+@app.get("/dashboard", tags=["Dashboard"])
+async def serve_dashboard():
+    dashboard_path = os.path.join(os.path.dirname(__file__), "..", "static", "dashboard.html")
+    return FileResponse(dashboard_path)
+
+
+
