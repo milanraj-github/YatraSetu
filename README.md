@@ -84,83 +84,89 @@ flowchart TD
 
 ```text
 YatraSetu/
-├── alembic/                      # Alembic database migration environment
-│   └── versions/                 # Versioned migration revision scripts
-├── app/
-│   ├── api/                      # REST & WebSocket API endpoints
-│   │   └── v1/
-│   │       ├── auth.py           # User registration & parent signup
-│   │       ├── boarding_points.py# Campus bus boarding points
-│   │       ├── buses.py          # Fleet management
-│   │       ├── drivers.py        # Driver-bus assignments
-│   │       ├── gps.py            # GPS ingestion & batch sync
-│   │       ├── health.py         # Service health & readiness probes
-│   │       ├── notifications.py  # FCM device token management
-│   │       ├── parent_links.py   # Student approval / rejection of link requests
-│   │       ├── parents.py        # Parent portal & approved child tracking
-│   │       ├── rbac.py           # Role validation test endpoints
-│   │       ├── routes.py         # Bus routes & route stops
-│   │       ├── trips.py          # Trip lifecycle management & ETA
-│   │       └── ws.py             # WebSocket streaming endpoint
+├── backend/                      # All backend source code & infrastructure
+│   ├── alembic/                  # Alembic database migration environment
+│   │   └── versions/             # Versioned migration revision scripts
+│   ├── app/
+│   │   ├── api/                  # REST & WebSocket API endpoints
+│   │   │   └── v1/
+│   │   │       ├── auth.py           # User registration & parent signup
+│   │   │       ├── boarding_points.py# Campus bus boarding points
+│   │   │       ├── buses.py          # Fleet management
+│   │   │       ├── drivers.py        # Driver-bus assignments
+│   │   │       ├── gps.py            # GPS ingestion & batch sync
+│   │   │       ├── health.py         # Service health & readiness probes
+│   │   │       ├── notifications.py  # FCM device token management
+│   │   │       ├── parent_links.py   # Student approval / rejection of link requests
+│   │   │       ├── parents.py        # Parent portal & approved child tracking
+│   │   │       ├── rbac.py           # Role validation test endpoints
+│   │   │       ├── routes.py         # Bus routes & route stops
+│   │   │       ├── trips.py          # Trip lifecycle management & ETA
+│   │   │       └── ws.py             # WebSocket streaming endpoint
+│   │   │
+│   │   ├── core/
+│   │   │   ├── config.py             # Pydantic Settings & environment validation
+│   │   │   ├── firebase.py           # Firebase Admin SDK initialization & token auth
+│   │   │   ├── redis.py              # Redis async client & connection pooling
+│   │   │   └── security.py           # RBAC dependency guards (require_role, etc.)
+│   │   │
+│   │   ├── db/
+│   │   │   ├── base.py               # SQLAlchemy 2.0 DeclarativeBase
+│   │   │   └── database.py           # AsyncEngine & async session factory
+│   │   │
+│   │   ├── models/                   # SQLAlchemy ORM database models
+│   │   │   ├── boarding_point.py     # BoardingPoint entity with geography coords
+│   │   │   ├── bus.py                # Bus entity
+│   │   │   ├── device_token.py       # UserDeviceToken entity
+│   │   │   ├── enums.py              # UserRole, TripStatus, NotificationType, etc.
+│   │   │   ├── location.py           # LocationPing historical GPS telemetry
+│   │   │   ├── notification.py       # Persistent Notification audit entity
+│   │   │   ├── parent_child.py       # ParentLinkRequest & ParentChildren models
+│   │   │   ├── route.py              # Route entity
+│   │   │   ├── route_stop.py         # RouteStop association model
+│   │   │   ├── trip.py               # Trip lifecycle entity
+│   │   │   └── user.py               # User entity with role & assigned_bus
+│   │   │
+│   │   ├── schemas/                  # Pydantic serialization & validation schemas
+│   │   └── services/                 # Business logic service abstractions
+│   │       ├── boarding_point_service.py
+│   │       ├── bus_service.py
+│   │       ├── driver_service.py
+│   │       ├── eta_service.py
+│   │       ├── geofence_notification_service.py # Phase 16: Geofence notifications
+│   │       ├── geofence_service.py   # PostGIS spatial calculations & Haversine fallback
+│   │       ├── gps_service.py        # GPS ingestion, batch sync, & Redis update
+│   │       ├── notification_service.py # Phase 15: FCM dispatch & Redis dedupe
+│   │       ├── parent_child_service.py
+│   │       ├── route_service.py
+│   │       ├── route_stop_service.py
+│   │       ├── trip_service.py
+│   │       └── websocket_manager.py  # WebSocket connection manager & broadcast
 │   │
-│   ├── core/
-│   │   ├── config.py             # Pydantic Settings & environment validation
-│   │   ├── firebase.py           # Firebase Admin SDK initialization & token auth
-│   │   ├── redis.py              # Redis async client & connection pooling
-│   │   └── security.py           # RBAC dependency guards (require_role, etc.)
+│   ├── tests/                        # Pytest automated test suite (189 tests)
+│   │   ├── conftest.py               # In-memory Redis & test client fixtures
+│   │   ├── test_auth.py
+│   │   ├── test_buses.py
+│   │   ├── test_eta.py
+│   │   ├── test_geofence.py
+│   │   ├── test_geofence_notifications.py # Phase 16 tests (35 test cases)
+│   │   ├── test_gps.py
+│   │   ├── test_gps_sync.py
+│   │   ├── test_notifications.py     # Phase 15 tests (12 test cases)
+│   │   ├── test_parent_child.py
+│   │   ├── test_routes.py
+│   │   ├── test_trips.py
+│   │   ├── test_websocket.py
+│   │   └── ...
 │   │
-│   ├── db/
-│   │   ├── base.py               # SQLAlchemy 2.0 DeclarativeBase
-│   │   └── database.py           # AsyncEngine & async session factory
-│   │
-│   ├── models/                   # SQLAlchemy ORM database models
-│   │   ├── boarding_point.py     # BoardingPoint entity with geography coords
-│   │   ├── bus.py                # Bus entity
-│   │   ├── device_token.py       # UserDeviceToken entity
-│   │   ├── enums.py              # UserRole, TripStatus, NotificationType, etc.
-│   │   ├── location.py           # LocationPing historical GPS telemetry
-│   │   ├── notification.py       # Persistent Notification audit entity
-│   │   ├── parent_child.py       # ParentLinkRequest & ParentChildren models
-│   │   ├── route.py              # Route entity
-│   │   ├── route_stop.py         # RouteStop association model
-│   │   ├── trip.py               # Trip lifecycle entity
-│   │   └── user.py               # User entity with role & assigned_bus
-│   │
-│   ├── schemas/                  # Pydantic serialization & validation schemas
-│   └── services/                 # Business logic service abstractions
-│       ├── boarding_point_service.py
-│       ├── bus_service.py
-│       ├── driver_service.py
-│       ├── eta_service.py
-│       ├── geofence_notification_service.py # Phase 16: Geofence notifications
-│       ├── geofence_service.py   # PostGIS spatial calculations & Haversine fallback
-│       ├── gps_service.py        # GPS ingestion, batch sync, & Redis update
-│       ├── notification_service.py # Phase 15: FCM dispatch & Redis dedupe
-│       ├── parent_child_service.py
-│       ├── route_service.py
-│       ├── route_stop_service.py
-│       ├── trip_service.py
-│       └── websocket_manager.py  # WebSocket connection manager & broadcast
+│   ├── alembic.ini                   # Alembic configuration
+│   ├── pytest.ini                    # Pytest configuration (pythonpath = .)
+│   ├── requirements.txt              # Production & test dependencies
+│   ├── docker-compose.yml            # Local PostgreSQL/PostGIS + Redis (name: yatrasetu)
+│   └── .env.example                  # Environment configuration template
 │
-├── tests/                        # Pytest automated test suite (189 tests)
-│   ├── conftest.py               # In-memory Redis & test client fixtures
-│   ├── test_auth.py
-│   ├── test_buses.py
-│   ├── test_eta.py
-│   ├── test_geofence.py
-│   ├── test_geofence_notifications.py # Phase 16 tests (35 test cases)
-│   ├── test_gps.py
-│   ├── test_gps_sync.py
-│   ├── test_notifications.py     # Phase 15 tests (12 test cases)
-│   ├── test_parent_child.py
-│   ├── test_routes.py
-│   ├── test_trips.py
-│   ├── test_websocket.py
-│   └── ...
-│
-├── docker-compose.yml            # Local development PostgreSQL/PostGIS + Redis
-├── requirements.txt              # Production & test dependencies
-└── .env.example                  # Environment configuration template
+├── README.md                         # Project documentation (this file)
+└── .gitignore
 ```
 
 ---
@@ -499,14 +505,15 @@ python -m venv .venv
 source .venv/bin/activate
 
 # 3. Install dependencies
+cd backend
 pip install -r requirements.txt
 
 # 4. Configure environment variables
 cp .env.example .env
-# Edit .env to set POSTGRES_PORT=5434 if using Docker Compose
+# Edit .env — set POSTGRES_PORT=5434 when using the Docker Compose stack
 
 # 5. Start PostgreSQL/PostGIS and Redis via Docker Compose
-docker-compose up -d
+docker compose up -d
 
 # 6. Apply database migrations
 alembic upgrade head
@@ -547,13 +554,14 @@ services:
       - redis_data:/data
 ```
 
-Start containers:
+Start containers (run from the `backend/` directory):
 ```bash
-docker-compose up -d
+cd backend
+docker compose up -d
 ```
 Check health:
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ---
@@ -638,7 +646,8 @@ The SMARTBUS API employs standardized, predictable HTTP status codes:
 The codebase is protected by **189 automated test cases** covering unit, integration, spatial, concurrency, and security invariants:
 
 ```bash
-# Run full test suite
+# Run full test suite (from the backend/ directory)
+cd backend
 pytest -q
 ```
 **Test Result:** `189 passed in ~50s (100% green)`
