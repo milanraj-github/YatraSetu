@@ -4,6 +4,10 @@
 > **Evaluation Target:** ~75% Backend Completion (Foundations, Transit Operations, Spatial Tracking, Parent Portal & Realtime Push Notifications).
 
 ---
+backend document:https://docs.google.com/document/d/1tqOp5mcTuBd4pPb2G7DEhb55tt4Xk_ZU/edit?usp=drivesdk&ouid=110039751150526135293&rtpof=true&sd=true
+Youtube video:https://youtu.be/bGDim8yR-PY
+
+---
 
 ## Table of Contents
 
