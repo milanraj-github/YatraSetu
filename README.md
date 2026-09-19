@@ -9,6 +9,7 @@
 
 | # | Section |
 |---|---------|
+| ⚡ | [Quick Start — Run Commands](#quick-start--run-commands) |
 | 1 | [Project Overview](#1-project-overview) |
 | 2 | [Current Implementation Status](#2-current-implementation-status) |
 | 3 | [Architecture & Data Flow](#3-architecture--data-flow) |
@@ -48,6 +49,51 @@ SMARTBUS solves these challenges by providing:
 4. **Automated FCM Push Notifications:** Event-driven proximity alerts (`BUS_NEARBY` and `BUS_ARRIVED`) dispatched to authorized parents with 30-minute Redis deduplication locks.
 5. **Privacy-Preserving Parent Portal:** Strict parent-child linking requiring two-way student verification before location access is granted.
 6. **Deterministic Baseline ETA Engine:** Real-time distance and estimated arrival calculations for ordered route stops based on dynamic live telemetry.
+
+---
+
+## Quick Start — Run Commands
+
+> **All backend commands run from inside the `backend/` directory.**
+
+```bash
+# 1. Clone & enter repo
+git clone https://github.com/milanraj-github/YatraSetu.git
+cd YatraSetu
+
+# 2. Create & activate virtual environment
+python -m venv .venv
+.\.venv\Scripts\activate        # Windows
+# source .venv/bin/activate     # Linux / macOS
+
+# 3. Install dependencies
+cd backend
+pip install -r requirements.txt
+
+# 4. Configure environment
+cp .env.example .env
+# Edit .env → set POSTGRES_PORT=5434, FIREBASE_PROJECT_ID, FIREBASE_CREDENTIALS_PATH
+
+# 5. Start PostgreSQL (PostGIS) + Redis
+docker compose up -d
+
+# 6. Apply database migrations
+alembic upgrade head
+
+# 7. Start API server
+uvicorn app.main:app --reload --port 8000
+```
+
+| URL | Purpose |
+|-----|---------|
+| `http://localhost:8000/docs` | Swagger interactive API docs |
+| `http://localhost:8000/redoc` | ReDoc documentation |
+| `http://localhost:8000/api/v1/health` | Health check |
+
+```bash
+# Run full test suite (189 tests)
+pytest -q
+```
 
 ---
 
