@@ -5,6 +5,38 @@
 
 ---
 
+## Table of Contents
+
+| # | Section |
+|---|---------|
+| 1 | [Project Overview](#1-project-overview) |
+| 2 | [Current Implementation Status](#2-current-implementation-status) |
+| 3 | [Architecture & Data Flow](#3-architecture--data-flow) |
+| 4 | [Repository & Project Structure](#4-repository--project-structure) |
+| 5 | [Technology Stack & Versions](#5-technology-stack--versions) |
+| 6 | [Database Models & Schema Design](#6-database-models--schema-design) |
+| 7 | [Authentication & RBAC](#7-authentication--role-based-access-control-rbac) |
+| 8 | [Role Capability Matrix](#8-role-capability-matrix) |
+| 9 | [Comprehensive API Documentation](#9-comprehensive-api-documentation) |
+| 10 | [GPS Telemetry & Real-Time Pipeline](#10-gps-telemetry--real-time-pipeline) |
+| 11 | [Offline GPS Batch Synchronization](#11-offline-gps-batch-synchronization) |
+| 12 | [PostGIS Spatial Engine & Geofencing](#12-postgis-spatial-engine--geofencing) |
+| 13 | [Push Notification & Deduplication System](#13-push-notification--deduplication-system) |
+| 14 | [Parent-Child Linking & Approval Workflow](#14-parent-child-linking--approval-workflow) |
+| 15 | [Deterministic Baseline ETA Engine](#15-deterministic-baseline-eta-engine) |
+| 16 | [WebSocket Real-Time Location Streaming](#16-websocket-real-time-location-streaming) |
+| 17 | [Environment Variables Reference](#17-environment-variables-reference) |
+| 18 | [Local Development Setup](#18-local-development-setup) |
+| 19 | [Docker Compose Infrastructure](#19-docker-compose-infrastructure) |
+| 20 | [Practical API Workflow Examples](#20-practical-api-workflow-examples) |
+| 21 | [Error Handling & HTTP Status Codes](#21-error-handling--http-status-codes) |
+| 22 | [Automated Testing Suite](#22-automated-testing-suite) |
+| 23 | [Security & Privacy Controls](#23-security--privacy-controls) |
+| 24 | [Future Work](#24-future-work-evaluation-2--post-evaluation) |
+| 25 | [Recommended Evaluation Demo Flow](#25-recommended-evaluation-demo-flow) |
+
+---
+
 ## 1. Project Overview
 
 **SMARTBUS** is a specialized, production-ready campus transit, safety, and tracking backend designed for collegiate shuttle systems. Operating a university transit network involves critical challenges: students stranded at stops, parents anxious about delays, drivers navigating irregular connectivity, and administrative overhead managing fleet assignments.
