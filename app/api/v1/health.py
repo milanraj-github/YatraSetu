@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis import check_redis_connection
 from app.db.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,13 @@ class DatabaseHealthResponse(BaseModel):
 
     status: str
     database: str
+
+
+class RedisHealthResponse(BaseModel):
+    """Schema for Redis health-check response."""
+
+    status: str
+    service: str
 
 
 @router.get(
@@ -62,5 +70,25 @@ async def database_health_check(
         logger.error(f"Database health check failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database connection failed: {exc!s}",
-        ) from exc
+            detail="Database service unavailable",
+        )
+
+
+@router.get(
+    "/health/redis",
+    response_model=RedisHealthResponse,
+    summary="Redis Health Check",
+    description="Check connectivity to the Redis server by executing PING.",
+)
+async def redis_health_check() -> RedisHealthResponse:
+    """Ping Redis to verify reachability."""
+    is_healthy = await check_redis_connection()
+    if not is_healthy:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Redis service unavailable",
+        )
+    return RedisHealthResponse(
+        status="ok",
+        service="redis",
+    )

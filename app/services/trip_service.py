@@ -15,7 +15,7 @@ from app.schemas.trip import TripCreate
 
 
 def verify_driver_trip_access(current_user: User, trip: Trip) -> None:
-    """Verify that current user is an ADMIN or the assigned DRIVER operating their designated bus."""
+    """Enforce driver ownership and assigned bus matching rule."""
     if current_user.role == UserRole.ADMIN:
         return
 
@@ -29,12 +29,12 @@ def verify_driver_trip_access(current_user: User, trip: Trip) -> None:
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Access forbidden: unauthorized role",
+        detail="Access forbidden: only administrators and assigned drivers can manage trip lifecycle",
     )
 
 
 async def create_trip(db: AsyncSession, trip_in: TripCreate) -> Trip:
-    """Create a new trip in SCHEDULED state after validating route, bus, and driver assignment."""
+    """Schedule a new trip after validating active route, active bus, and driver bus assignment."""
     # 1. Verify route exists and is active
     res_route = await db.execute(select(Route).where(Route.id == trip_in.route_id))
     route = res_route.scalar_one_or_none()
@@ -46,7 +46,7 @@ async def create_trip(db: AsyncSession, trip_in: TripCreate) -> Trip:
     if not route.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot schedule a trip on an inactive route",
+            detail="Cannot schedule a trip with an inactive route",
         )
 
     # 2. Verify bus exists and is active
@@ -69,12 +69,12 @@ async def create_trip(db: AsyncSession, trip_in: TripCreate) -> Trip:
     if not driver:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Driver not found",
+            detail="Driver user not found",
         )
     if driver.role != UserRole.DRIVER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Assigned user is not a driver (role is {driver.role.value})",
+            detail=f"User is not a driver (role is {driver.role.value})",
         )
 
     # 4. Verify driver is assigned to the specified bus
@@ -148,6 +148,8 @@ async def start_trip(db: AsyncSession, trip: Trip, current_user: User) -> Trip:
 
 async def end_trip(db: AsyncSession, trip: Trip, current_user: User) -> Trip:
     """Transition an IN_PROGRESS trip to COMPLETED (ADMIN or assigned DRIVER)."""
+    from app.services.gps_service import cleanup_trip_live_location
+
     verify_driver_trip_access(current_user, trip)
 
     if trip.status != TripStatus.IN_PROGRESS:
@@ -160,11 +162,17 @@ async def end_trip(db: AsyncSession, trip: Trip, current_user: User) -> Trip:
     trip.actual_end_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(trip)
+
+    # Cleanup live location cache from Redis
+    await cleanup_trip_live_location(trip.id)
+
     return trip
 
 
 async def cancel_trip(db: AsyncSession, trip: Trip, current_user: User) -> Trip:
     """Transition a SCHEDULED trip to CANCELLED (ADMIN only)."""
+    from app.services.gps_service import cleanup_trip_live_location
+
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -180,4 +188,8 @@ async def cancel_trip(db: AsyncSession, trip: Trip, current_user: User) -> Trip:
     trip.status = TripStatus.CANCELLED
     await db.commit()
     await db.refresh(trip)
+
+    # Cleanup live location cache from Redis if any exists
+    await cleanup_trip_live_location(trip.id)
+
     return trip

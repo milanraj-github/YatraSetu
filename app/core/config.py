@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_ECHO: bool = False
 
+    # Redis Configuration
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # Firebase Authentication Configuration
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None

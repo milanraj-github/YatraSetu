@@ -57,3 +57,20 @@ class LocationPingResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LiveLocationResponse(BaseModel):
+    """Response schema for latest live location state stored in Redis."""
+
+    trip_id: uuid.UUID
+    driver_id: uuid.UUID
+    bus_id: uuid.UUID
+    latitude: float
+    longitude: float
+    recorded_at: datetime
+    received_at: datetime
+    accuracy_meters: Optional[float] = None
+    speed_mps: Optional[float] = None
+    heading_degrees: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)

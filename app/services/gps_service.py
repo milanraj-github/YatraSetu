@@ -1,15 +1,107 @@
+import json
+import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Sequence
+from typing import Optional, Sequence
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.redis import get_redis_client
 from app.models.enums import TripStatus, UserRole
 from app.models.location import LocationPing
 from app.models.trip import Trip
 from app.models.user import User
-from app.schemas.gps import LocationPingCreate
+from app.schemas.gps import LiveLocationResponse, LocationPingCreate
+
+logger = logging.getLogger(__name__)
+
+# Lua script to atomically update live location if new recorded_at >= current recorded_at
+LUA_UPDATE_LIVE_LOCATION = """
+local key = KEYS[1]
+local new_data = ARGV[1]
+local new_epoch = tonumber(ARGV[2])
+
+local current = redis.call('GET', key)
+if current then
+    local current_obj = cjson.decode(current)
+    local current_epoch = tonumber(current_obj.recorded_at_epoch or 0)
+    if new_epoch >= current_epoch then
+        redis.call('SET', key, new_data)
+        return 1
+    else
+        return 0
+    end
+else
+    redis.call('SET', key, new_data)
+    return 1
+end
+"""
+
+
+def get_live_location_key(trip_id: uuid.UUID) -> str:
+    """Return the standard Redis key for a trip's live location."""
+    return f"smartbus:trip:{trip_id}:live"
+
+
+async def update_trip_live_location(
+    trip_id: uuid.UUID,
+    driver_id: uuid.UUID,
+    bus_id: uuid.UUID,
+    latitude: float,
+    longitude: float,
+    recorded_at: datetime,
+    received_at: datetime,
+    accuracy_meters: Optional[float] = None,
+    speed_mps: Optional[float] = None,
+    heading_degrees: Optional[float] = None,
+) -> bool:
+    """Atomically update Redis live location for a trip without moving backwards in time."""
+    try:
+        redis_client = get_redis_client()
+        key = get_live_location_key(trip_id)
+
+        # Ensure recorded_at has timezone info for epoch calculation
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+        recorded_at_epoch = recorded_at.timestamp()
+
+        payload = {
+            "trip_id": str(trip_id),
+            "driver_id": str(driver_id),
+            "bus_id": str(bus_id),
+            "latitude": latitude,
+            "longitude": longitude,
+            "recorded_at": recorded_at.isoformat(),
+            "received_at": received_at.isoformat(),
+            "accuracy_meters": accuracy_meters,
+            "speed_mps": speed_mps,
+            "heading_degrees": heading_degrees,
+            "recorded_at_epoch": recorded_at_epoch,
+        }
+        json_payload = json.dumps(payload)
+
+        result = await redis_client.eval(
+            LUA_UPDATE_LIVE_LOCATION,
+            1,
+            key,
+            json_payload,
+            str(recorded_at_epoch),
+        )
+        return bool(result == 1)
+    except Exception as exc:
+        logger.warning(f"Failed to update live location in Redis for trip {trip_id}: {exc}")
+        return False
+
+
+async def cleanup_trip_live_location(trip_id: uuid.UUID) -> None:
+    """Remove Redis live location key on trip end or cancellation."""
+    try:
+        redis_client = get_redis_client()
+        key = get_live_location_key(trip_id)
+        await redis_client.delete(key)
+    except Exception as exc:
+        logger.warning(f"Failed to delete Redis live location for trip {trip_id}: {exc}")
 
 
 async def ingest_location_ping(
@@ -18,7 +110,7 @@ async def ingest_location_ping(
     current_user: User,
     ping_in: LocationPingCreate,
 ) -> LocationPing:
-    """Ingest and persist a GPS telemetry ping for an active trip."""
+    """Ingest and persist a GPS telemetry ping for an active trip in DB and Redis."""
     # 1. Enforce DRIVER role strictly (Admin cannot ingest GPS on behalf of driver)
     if current_user.role != UserRole.DRIVER:
         raise HTTPException(
@@ -68,6 +160,20 @@ async def ingest_location_ping(
     await db.commit()
     await db.refresh(location_ping)
 
+    # 6. Update Redis live location state asynchronously without blocking or failing DB record
+    await update_trip_live_location(
+        trip_id=trip.id,
+        driver_id=current_user.id,
+        bus_id=trip.bus_id,
+        latitude=ping_in.latitude,
+        longitude=ping_in.longitude,
+        recorded_at=ping_in.recorded_at,
+        received_at=server_received_at,
+        accuracy_meters=ping_in.accuracy_meters,
+        speed_mps=ping_in.speed_mps,
+        heading_degrees=ping_in.heading_degrees,
+    )
+
     return location_ping
 
 
@@ -77,7 +183,6 @@ async def get_trip_location_history(
     current_user: User,
 ) -> Sequence[LocationPing]:
     """Retrieve historical GPS location points for a trip ordered chronologically."""
-    # 1. Retrieve trip
     result = await db.execute(select(Trip).where(Trip.id == trip_id))
     trip = result.scalar_one_or_none()
     if not trip:
@@ -86,14 +191,12 @@ async def get_trip_location_history(
             detail="Trip not found",
         )
 
-    # 2. Enforce role permissions (ADMIN sees all, DRIVER only sees their own trip)
     if current_user.role == UserRole.DRIVER and trip.driver_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Drivers can only view GPS history for their own trips",
         )
 
-    # 3. Retrieve location pings ordered chronologically
     pings_result = await db.execute(
         select(LocationPing)
         .where(LocationPing.trip_id == trip_id)
@@ -104,3 +207,59 @@ async def get_trip_location_history(
         )
     )
     return pings_result.scalars().all()
+
+
+async def get_trip_live_location(
+    db: AsyncSession,
+    trip_id: uuid.UUID,
+    current_user: User,
+) -> LiveLocationResponse:
+    """Retrieve current live location for an active trip from Redis."""
+    # 1. Retrieve and verify trip exists in PostgreSQL
+    result = await db.execute(select(Trip).where(Trip.id == trip_id))
+    trip = result.scalar_one_or_none()
+    if not trip:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trip not found",
+        )
+
+    # 2. Enforce role-based access
+    if current_user.role == UserRole.DRIVER:
+        if trip.driver_id != current_user.id or trip.bus_id != current_user.assigned_bus_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden: drivers can only view live location for their assigned trips",
+            )
+
+    # 3. Query Redis for latest live location state
+    try:
+        redis_client = get_redis_client()
+        key = get_live_location_key(trip_id)
+        raw_data = await redis_client.get(key)
+    except Exception as exc:
+        logger.error(f"Error querying Redis live location for trip {trip_id}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Live location service temporarily unavailable",
+        )
+
+    if not raw_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No live location available for this trip",
+        )
+
+    data = json.loads(raw_data)
+    return LiveLocationResponse(
+        trip_id=uuid.UUID(data["trip_id"]),
+        driver_id=uuid.UUID(data["driver_id"]),
+        bus_id=uuid.UUID(data["bus_id"]),
+        latitude=data["latitude"],
+        longitude=data["longitude"],
+        recorded_at=datetime.fromisoformat(data["recorded_at"]),
+        received_at=datetime.fromisoformat(data["received_at"]),
+        accuracy_meters=data.get("accuracy_meters"),
+        speed_mps=data.get("speed_mps"),
+        heading_degrees=data.get("heading_degrees"),
+    )

@@ -7,10 +7,14 @@ from app.core.security import require_role, require_roles
 from app.db.database import get_db
 from app.models.enums import UserRole
 from app.models.user import User
-from app.schemas.gps import LocationPingCreate, LocationPingResponse
+from app.schemas.gps import (
+    LiveLocationResponse,
+    LocationPingCreate,
+    LocationPingResponse,
+)
 from app.services import gps_service
 
-router = APIRouter(prefix="/trips", tags=["GPS Telemetry"])
+router = APIRouter(prefix="/trips", tags=["GPS Telemetry & Live Location"])
 
 
 @router.post(
@@ -44,3 +48,19 @@ async def get_trip_gps_history_endpoint(
 ) -> List[LocationPingResponse]:
     """Retrieve chronological GPS history for a trip."""
     return await gps_service.get_trip_location_history(db, trip_id, current_user)
+
+
+@router.get(
+    "/{trip_id}/live",
+    response_model=LiveLocationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Current Live Location for a Trip",
+    description="Retrieve the latest cached live location for an active trip from Redis (ADMIN or assigned DRIVER).",
+)
+async def get_trip_live_location_endpoint(
+    trip_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.DRIVER)),
+) -> LiveLocationResponse:
+    """Retrieve the latest cached live location for a trip."""
+    return await gps_service.get_trip_live_location(db, trip_id, current_user)
