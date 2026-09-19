@@ -10,6 +10,21 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
+    # PostgreSQL Database Configuration
+    POSTGRES_USER: str = "smartbus_user"
+    POSTGRES_PASSWORD: str = "smartbus_password"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "smartbus_db"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://smartbus_user:smartbus_password@localhost:5432/smartbus_db"
+    )
+
+    # Database connection pool settings
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_ECHO: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

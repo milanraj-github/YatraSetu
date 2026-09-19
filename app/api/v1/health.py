@@ -1,14 +1,28 @@
-from fastapi import APIRouter
+import logging
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Health"])
 
 
 class HealthResponse(BaseModel):
-    """Schema for health-check endpoint response."""
+    """Schema for general health-check response."""
 
     status: str
     service: str
+
+
+class DatabaseHealthResponse(BaseModel):
+    """Schema for database health-check response."""
+
+    status: str
+    database: str
 
 
 @router.get(
@@ -18,8 +32,35 @@ class HealthResponse(BaseModel):
     description="Check the operational status of the SMARTBUS backend service.",
 )
 async def health_check() -> HealthResponse:
-    """Return the health status of the backend service."""
+    """Return the general health status of the backend service."""
     return HealthResponse(
         status="healthy",
         service="smartbus-backend",
     )
+
+
+@router.get(
+    "/health/db",
+    response_model=DatabaseHealthResponse,
+    summary="Database Health Check",
+    description="Check connectivity to the PostgreSQL database by executing SELECT 1.",
+)
+async def database_health_check(
+    db: AsyncSession = Depends(get_db),
+) -> DatabaseHealthResponse:
+    """Execute SELECT 1 to verify database reachability."""
+    try:
+        result = await db.execute(text("SELECT 1"))
+        scalar = result.scalar()
+        if scalar != 1:
+            raise ValueError("Unexpected query result from database")
+        return DatabaseHealthResponse(
+            status="healthy",
+            database="connected",
+        )
+    except Exception as exc:
+        logger.error(f"Database health check failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connection failed: {exc!s}",
+        ) from exc
