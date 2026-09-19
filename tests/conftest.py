@@ -29,9 +29,22 @@ class FakeAsyncRedis:
             raise ConnectionError("Simulated Redis connection failure")
         return self._store.get(key)
 
-    async def set(self, key: str, value: str):
+    async def set(
+        self,
+        key: str,
+        value: str,
+        ex: int | None = None,
+        px: int | None = None,
+        nx: bool = False,
+        xx: bool = False,
+        **kwargs,
+    ):
         if not self.is_healthy:
             raise ConnectionError("Simulated Redis connection failure")
+        if nx and key in self._store:
+            return None
+        if xx and key not in self._store:
+            return None
         self._store[key] = value
         return True
 

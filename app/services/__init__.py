@@ -5,6 +5,7 @@ from app.services import (
     eta_service,
     geofence_service,
     gps_service,
+    notification_service,
     parent_child_service,
     route_service,
     route_stop_service,
@@ -22,6 +23,7 @@ __all__ = [
     "parent_child_service",
     "geofence_service",
     "eta_service",
+    "notification_service",
 ]
 
 

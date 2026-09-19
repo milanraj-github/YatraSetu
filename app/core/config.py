@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Basic ETA Engine Configuration (baseline deterministic speed in m/s)
     DEFAULT_ETA_SPEED_MPS: float = 8.0
 
+    # Push Notification & FCM Configuration
+    FCM_ENABLED: bool = True
+    NOTIFICATION_DEDUPE_TTL_SECONDS: int = 1800
+
     @field_validator("DEFAULT_ETA_SPEED_MPS")
     @classmethod
     def validate_eta_speed(cls, v: float) -> float:

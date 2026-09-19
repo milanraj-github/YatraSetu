@@ -16,6 +16,11 @@ from app.schemas.gps import (
     LocationPingResponse,
 )
 from app.schemas.eta import StopETAResponse, TripETAResponse
+from app.schemas.notification import (
+    DeviceTokenRegisterRequest,
+    DeviceTokenResponse,
+    NotificationResponse,
+)
 from app.schemas.parent_child import (
     ParentChildResponse,
     ParentLinkRequestResponse,
@@ -75,6 +80,9 @@ __all__ = [
     "ParentChildResponse",
     "StopETAResponse",
     "TripETAResponse",
+    "DeviceTokenRegisterRequest",
+    "DeviceTokenResponse",
+    "NotificationResponse",
 ]
 
 

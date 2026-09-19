@@ -11,6 +11,8 @@ from app.models.enums import UserRole
 
 if TYPE_CHECKING:
     from app.models.bus import Bus
+    from app.models.device_token import UserDeviceToken
+    from app.models.notification import Notification
 
 
 class User(Base):
@@ -54,6 +56,17 @@ class User(Base):
         "Bus",
         back_populates="drivers",
         foreign_keys=[assigned_bus_id],
+    )
+
+    device_tokens: Mapped[list[UserDeviceToken]] = relationship(
+        "UserDeviceToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    notifications: Mapped[list[Notification]] = relationship(
+        "Notification",
+        back_populates="recipient",
+        cascade="all, delete-orphan",
     )
 
     created_at: Mapped[datetime] = mapped_column(

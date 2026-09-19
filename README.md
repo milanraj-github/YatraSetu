@@ -1,7 +1,7 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 14 Complete — Basic ETA Engine.  
-> *(Note: Baseline deterministic ETA calculation using PostGIS ST_Distance and configurable average speed complete. FCM, Email, Notifications, and Emergency/SOS belong to future phases).*
+> **Status:** Phase 15 Complete — FCM Push Notification Foundation.  
+> *(Note: Push notification data model, device token registration, FCM dispatch, token invalidation, and Redis 30-minute deduplication complete. Automated triggers like geofence notifications, delay detection, emergency alerts, and notification workers belong to future phases).*
 
 
 
@@ -322,6 +322,39 @@ FastAPI Backend
 
 
 
+## FCM Push Notification Foundation (Phase 15)
+
+```text
+Client Device (Flutter / Web)
+       │
+       ├──► 1. POST /api/v1/notifications/devices (Register FCM device push token)
+       │       - Stored in `user_device_tokens` table
+       │       - Token value kept secret (never returned in responses)
+       │       - Idempotent: re-registration reactivates token
+       │
+       └──► 2. DELETE /api/v1/notifications/devices/{id} (Deactivate device token)
+               - Sets `is_active = False`
+
+Backend Event Trigger (Future: Geofence, Delay, Emergency)
+       │
+       ▼ notification_service.send_notification(...)
+       │
+       ├──► 3. Redis 30-min Deduplication Lock:
+       │       - Key: `smartbus:notification:dedupe:{recipient_id}:{type}:{event_key}`
+       │       - `SET ... EX 1800 NX`
+       │       - If duplicate exists within 30 min -> suppressed cleanly
+       │       - If Redis fails -> gracefully degrades and proceeds with delivery
+       │
+       ├──► 4. PostgreSQL Notification Persistence:
+       │       - Stored in `notifications` table in `PENDING` state before dispatch
+       │
+       └──► 5. FCM Push Dispatch (via Firebase Admin SDK):
+               - Dispatches to all active device tokens for recipient
+               - Non-blocking execution via worker threads (`asyncio.to_thread`)
+               - Invalid/stale tokens (`UnregisteredError`) automatically marked `is_active = False`
+               - Delivery outcome updates status to `SENT` or `FAILED`
+```
+
 ---
 
 ## Running Automated Tests
@@ -329,3 +362,4 @@ FastAPI Backend
 ```bash
 pytest -v
 ```
+
