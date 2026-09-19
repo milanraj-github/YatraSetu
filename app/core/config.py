@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Optional
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +37,8 @@ class Settings(BaseSettings):
 
     # Geofencing Configuration
     DEFAULT_GEOFENCE_RADIUS_METERS: float = 100.0
+    BUS_NEARBY_RADIUS_METERS: float = 500.0
+    BUS_ARRIVAL_RADIUS_METERS: float = 100.0
 
     # Basic ETA Engine Configuration (baseline deterministic speed in m/s)
     DEFAULT_ETA_SPEED_MPS: float = 8.0
@@ -51,6 +53,22 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError("DEFAULT_ETA_SPEED_MPS must be strictly greater than 0")
         return v
+
+    @field_validator("BUS_NEARBY_RADIUS_METERS", "BUS_ARRIVAL_RADIUS_METERS")
+    @classmethod
+    def validate_positive_radius(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Geofence radii must be strictly greater than 0")
+        return v
+
+    @model_validator(mode="after")
+    def validate_geofence_radii_relationship(self) -> "Settings":
+        if self.BUS_NEARBY_RADIUS_METERS <= self.BUS_ARRIVAL_RADIUS_METERS:
+            raise ValueError(
+                f"BUS_NEARBY_RADIUS_METERS ({self.BUS_NEARBY_RADIUS_METERS}) must be strictly "
+                f"greater than BUS_ARRIVAL_RADIUS_METERS ({self.BUS_ARRIVAL_RADIUS_METERS})"
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

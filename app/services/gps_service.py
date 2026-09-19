@@ -18,6 +18,7 @@ from app.schemas.gps import (
     LiveLocationResponse,
     LocationPingCreate,
 )
+from app.services import geofence_notification_service
 from app.services.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -188,7 +189,7 @@ async def ingest_location_ping(
     await db.refresh(location_ping)
 
     # 6. Update Redis live location state and Pub/Sub channel
-    await update_trip_live_location(
+    live_updated = await update_trip_live_location(
         trip_id=trip.id,
         driver_id=current_user.id,
         bus_id=trip.bus_id,
@@ -200,6 +201,21 @@ async def ingest_location_ping(
         speed_mps=ping_in.speed_mps,
         heading_degrees=ping_in.heading_degrees,
     )
+
+    # 7. If live location was successfully updated in Redis (not stale), check geofences
+    if live_updated:
+        try:
+            await geofence_notification_service.process_gps_geofence_events(
+                db=db,
+                trip=trip,
+                latitude=ping_in.latitude,
+                longitude=ping_in.longitude,
+                recorded_at=ping_in.recorded_at,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"Failed to process geofence notifications for trip {trip.id}: {exc}"
+            )
 
     return location_ping
 
@@ -289,7 +305,7 @@ async def sync_location_pings_batch(
         # To maintain monotonicity, sort chronologically by recorded_at
         sorted_accepted = sorted(accepted_points, key=lambda p: p.recorded_at)
         for pt in sorted_accepted:
-            await update_trip_live_location(
+            live_updated = await update_trip_live_location(
                 trip_id=trip.id,
                 driver_id=current_user.id,
                 bus_id=trip.bus_id,
@@ -301,6 +317,19 @@ async def sync_location_pings_batch(
                 speed_mps=pt.speed_mps,
                 heading_degrees=pt.heading_degrees,
             )
+            if live_updated:
+                try:
+                    await geofence_notification_service.process_gps_geofence_events(
+                        db=db,
+                        trip=trip,
+                        latitude=pt.latitude,
+                        longitude=pt.longitude,
+                        recorded_at=pt.recorded_at,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to process geofence notifications in batch for trip {trip.id}: {exc}"
+                    )
 
     return GPSBatchSyncResponse(
         trip_id=trip.id,
