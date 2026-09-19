@@ -38,7 +38,7 @@ async def create_test_user(role: UserRole, prefix: str = "ws_user", assigned_bus
 async def create_test_bus(is_active: bool = True) -> Bus:
     """Helper to seed a test bus."""
     bus_num = f"BUS-{uuid.uuid4().hex[:6].upper()}"
-    reg_num = f"KA-20-{uuid.uuid4().hex[:4].upper()}"
+    reg_num = f"KA-20-{uuid.uuid4().hex[:8].upper()}"
 
     async with async_session_factory() as session:
         bus = Bus(
