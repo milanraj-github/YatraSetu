@@ -24,6 +24,8 @@ async def create_boarding_point(
     return bp
 
 
+
+
 async def get_boarding_point_by_id(
     db: AsyncSession, bp_id: uuid.UUID
 ) -> Optional[BoardingPoint]:
@@ -73,6 +75,8 @@ async def update_boarding_point(
     await db.commit()
     await db.refresh(bp)
     return bp
+
+
 
 
 async def deactivate_boarding_point(

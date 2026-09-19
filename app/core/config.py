@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None
     FIREBASE_CREDENTIALS_JSON: Optional[str] = None
 
+    # Geofencing Configuration
+    DEFAULT_GEOFENCE_RADIUS_METERS: float = 100.0
+
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

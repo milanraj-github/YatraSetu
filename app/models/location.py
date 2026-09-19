@@ -2,11 +2,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
+from geoalchemy2 import Geography
 from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
 
 if TYPE_CHECKING:
     from app.models.trip import Trip
@@ -81,6 +83,12 @@ class LocationPing(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+
+    @property
+    def location(self) -> str:
+        """PostGIS WKT Point representation with SRID 4326 (longitude X, latitude Y)."""
+        return f"SRID=4326;POINT({self.longitude} {self.latitude})"
+
     accuracy_meters: Mapped[Optional[float]] = mapped_column(
         Float,
         nullable=True,

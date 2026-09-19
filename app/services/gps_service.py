@@ -182,6 +182,7 @@ async def ingest_location_ping(
         heading_degrees=ping_in.heading_degrees,
     )
 
+
     db.add(location_ping)
     await db.commit()
     await db.refresh(location_ping)
@@ -277,10 +278,12 @@ async def sync_location_pings_batch(
                 speed_mps=pt.speed_mps,
                 heading_degrees=pt.heading_degrees,
             )
+
             for pt in accepted_points
         ]
         db.add_all(new_pings)
         await db.commit()
+
 
         # 8. Update Redis live location for accepted points
         # To maintain monotonicity, sort chronologically by recorded_at

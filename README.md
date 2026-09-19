@@ -1,7 +1,8 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 12 Complete — Parent–Child Linking, Approval Workflow & Live Tracking.  
-> *(Note: Parent linking and approved live tracking complete. PostGIS, Geofencing, ETA, Notifications, and Emergency/SOS belong to future phases).*
+> **Status:** Phase 13 Complete — PostGIS Spatial Foundation & Geofencing.  
+> *(Note: PostGIS spatial storage & geofence proximity calculations complete. FCM, Email, Notifications, ETA, and Emergency/SOS belong to future phases).*
+
 
 
 
@@ -212,7 +213,31 @@ Driver GPS Request
 
 ---
 
+## PostGIS & Geofencing Foundation (Phase 13)
+
+```text
+Incoming GPS Point (lat, lon)
+       │
+       ├──► Format as WGS-84 Point: POINT(longitude latitude) [SRID: 4326]
+       │
+       ├──► PostGIS ST_Distance / ST_DWithin (against BoardingPoint location)
+       │
+       └──► Reusable Geofence Service (app/services/geofence_service.py)
+            - calculate_distance_meters(lat1, lon1, lat2, lon2)
+            - is_within_geofence(lat1, lon1, lat2, lon2, radius_meters=100.0)
+            - get_distance_to_boarding_point(lat, lon, boarding_point)
+            - is_gps_within_boarding_point(lat, lon, boarding_point, radius_meters)
+```
+
+- **Spatial Representation:** Uses WGS 84 ellipsoid coordinate system (`SRID: 4326`). Coordinate order is strictly `POINT(longitude latitude)` (X=longitude, Y=latitude).
+- **PostgreSQL / Docker:** Configured with `postgis/postgis:16-3.4-alpine` image in `docker-compose.yml`.
+- **Configurable Radius:** Configured via `DEFAULT_GEOFENCE_RADIUS_METERS=100.0` in Pydantic settings.
+- **GiST Spatial Indexing:** Created on `boarding_points` and `location_pings` spatial columns in target PostgreSQL + PostGIS environments.
+
+---
+
 ## Parent–Child Linking & Approval Workflow (Phase 12)
+
 
 ```text
 Parent Mobile App                          Student Web/App

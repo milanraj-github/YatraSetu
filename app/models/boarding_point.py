@@ -2,6 +2,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
+from geoalchemy2 import Geography
 from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,6 +11,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.route_stop import RouteStop
+
 
 
 class BoardingPoint(Base):
@@ -48,6 +50,13 @@ class BoardingPoint(Base):
         String(255),
         nullable=True,
     )
+
+    @property
+    def location(self) -> str:
+        """PostGIS WKT Point representation with SRID 4326 (longitude X, latitude Y)."""
+        return f"SRID=4326;POINT({self.longitude} {self.latitude})"
+
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
