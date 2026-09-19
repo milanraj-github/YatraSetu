@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,6 +55,49 @@ async def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found in system",
+        )
+
+    return user
+
+
+async def get_websocket_user(
+    websocket: WebSocket,
+    db: AsyncSession,
+) -> User:
+    """Authenticate and resolve the current user for a WebSocket connection."""
+    auth_header = websocket.headers.get("authorization") or websocket.headers.get("Authorization")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    elif "token" in websocket.query_params:
+        token = websocket.query_params["token"]
+
+    if not token:
+        raise HTTPException(
+            status_code=status.WS_1008_POLICY_VIOLATION,
+            detail="Missing authentication token",
+        )
+
+    try:
+        decoded = verify_firebase_token(token)
+        uid = decoded.get("uid")
+        if not uid:
+            raise HTTPException(
+                status_code=status.WS_1008_POLICY_VIOLATION,
+                detail="Invalid token payload",
+            )
+    except Exception:
+        raise HTTPException(
+            status_code=status.WS_1008_POLICY_VIOLATION,
+            detail="Token verification failed",
+        )
+
+    result = await db.execute(select(User).where(User.firebase_uid == uid))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.WS_1008_POLICY_VIOLATION,
             detail="User not found in system",
         )
 

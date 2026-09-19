@@ -1,7 +1,7 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 9 Complete — Redis-Backed Live Location State & Monotonic Telemetry Tracking.  
-> *(Note: WebSockets, PostGIS, Geofencing, ETA, Notifications, and Emergency systems belong to future phases).*
+> **Status:** Phase 10 Complete — Realtime WebSocket Telemetry Streaming via Redis Pub/Sub.  
+> *(Note: WebSockets live streaming complete. PostGIS, Geofencing, ETA, Notifications, Emergency/SOS, and Parent Linking belong to future phases).*
 
 SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **ADMIN**, **DRIVER**, **STUDENT**, and **PARENT**.
 
@@ -11,11 +11,11 @@ SMARTBUS is a modern college campus transportation backend designed to support l
 
 ### Current Stack:
 - **Language:** Python 3.11+
-- **Web Framework:** FastAPI
+- **Web Framework:** FastAPI (REST + WebSockets)
 - **ASGI Server:** Uvicorn
-- **In-Memory Cache / State:** Redis 7.2 (`redis.asyncio` with connection pooling & Lua atomic scripts)
-- **Authentication:** Firebase Authentication (Firebase ID Token verification)
-- **Authorization (RBAC):** PostgreSQL `User.role` + FastAPI dependency injection (`require_role`, `require_roles`)
+- **In-Memory Cache & Pub/Sub:** Redis 7.2 (`redis.asyncio` with connection pooling, Pub/Sub & Lua atomic scripts)
+- **Authentication:** Firebase Authentication (Firebase ID Token verification over HTTP and WebSockets)
+- **Authorization (RBAC):** PostgreSQL `User.role` + FastAPI dependency injection (`require_role`, `require_roles`, `get_websocket_user`)
 - **ORM:** SQLAlchemy 2.0 (Async Engine & AsyncSession)
 - **Database Driver:** asyncpg
 - **Database Engine:** PostgreSQL 16+
@@ -39,7 +39,7 @@ smartbus-backend/
 │   │   ├── config.py        # Pydantic Settings (App, DB, Redis, and Firebase)
 │   │   ├── firebase.py      # Firebase Admin SDK init & token verification
 │   │   ├── redis.py         # Redis async connection pool & lifecycle management
-│   │   └── security.py      # Auth & RBAC dependencies (require_role, require_roles)
+│   │   └── security.py      # Auth & RBAC dependencies (require_role, require_roles, get_websocket_user)
 │   │
 │   ├── db/
 │   │   ├── __init__.py      # DB exports (Base, engine, session factory, get_db)
@@ -76,7 +76,8 @@ smartbus-backend/
 │   │   ├── route_stop_service.py     # Stop sequencing and safe reordering
 │   │   ├── driver_service.py         # Driver bus assignment & verification
 │   │   ├── trip_service.py           # Trip lifecycle & driver ownership
-│   │   └── gps_service.py            # GPS ingestion, Redis live location & history
+│   │   ├── gps_service.py            # GPS ingestion, Redis live location & history
+│   │   └── websocket_manager.py      # WebSocket connection & Redis Pub/Sub manager
 │   │
 │   └── api/
 │       ├── __init__.py
@@ -90,7 +91,8 @@ smartbus-backend/
 │           ├── boarding_points.py # Boarding Points API (/api/v1/boarding-points)
 │           ├── drivers.py         # Driver bus assignment API (/api/v1/drivers)
 │           ├── trips.py           # Trip management & lifecycle API (/api/v1/trips)
-│           └── gps.py             # GPS Ingestion, History & Live Location API
+│           ├── gps.py             # GPS Ingestion, History & Live Location API
+│           └── ws.py              # Realtime WebSocket telemetry streaming (/ws/trips/{id})
 │
 ├── alembic/
 │   ├── versions/            # Database migration scripts
@@ -113,7 +115,8 @@ smartbus-backend/
 │   ├── test_drivers.py      # Driver assignment and unassignment tests
 │   ├── test_trips.py        # Trip creation, driver ownership, and lifecycle tests
 │   ├── test_gps.py          # GPS ingestion, validation, out-of-order & duplicate retention tests
-│   └── test_redis.py        # Redis health, monotonic live location updates, fault tolerance & cleanup tests
+│   ├── test_redis.py        # Redis health, monotonic live location updates & cleanup tests
+│   └── test_websocket.py    # WebSocket auth, RBAC, initial state, monotonic live streaming & multi-client tests
 │
 ├── .env                     # Local secrets & configs (git-ignored)
 ├── .env.example             # Environment variable template
@@ -127,47 +130,44 @@ smartbus-backend/
 
 ---
 
-## Redis + Live Location Architecture (Phase 9)
+## Realtime WebSocket Telemetry Architecture (Phase 10)
 
-### 1. Dual-Store Strategy
 ```text
 Driver GPS Request
        │
-       ├──► PostgreSQL (LocationPing) ──► Historical audit trail (stores ALL valid points)
+       ├──► PostgreSQL (LocationPing) ──► Complete historical audit log
        │
-       └──► Redis (smartbus:trip:{id}:live) ──► Latest live location pointer (monotonic)
+       └──► Redis (SET smartbus:trip:{id}:live & PUBLISH smartbus:trip:{id}:location)
+                    │
+                    ▼ (Pub/Sub Broadcast)
+             WebSocketManager
+                    │
+                    ├──► Admin Web Dashboard (WS)
+                    ├──► Assigned Driver App (WS)
+                    └──► (Future Student / Parent Subscribers)
 ```
 
-### 2. Monotonic Live Location Guarantee
-- **Lua Script Atomicity:** Redis live location updates are executed using a Lua script that performs atomic compare-and-set based on `recorded_at` (device capture timestamp).
-- **Out-of-Order Handling:** Older GPS points arriving late are persisted to PostgreSQL for historical completeness but will **never** move the Redis live location pointer backwards in time.
-- **Key Format:** `smartbus:trip:{trip_id}:live`
-- **Stored Payload:**
-  ```json
-  {
-    "trip_id": "...",
-    "driver_id": "...",
-    "bus_id": "...",
-    "latitude": 13.3409,
-    "longitude": 74.7421,
-    "recorded_at": "2026-09-19T10:05:00+00:00",
-    "received_at": "2026-09-19T10:05:00.123456+00:00",
-    "accuracy_meters": 5.0,
-    "speed_mps": 8.5,
-    "heading_degrees": 120.0,
-    "recorded_at_epoch": 1789812300.0
-  }
-  ```
+### 1. Atomic Monotonic Lua Update + Pub/Sub
+- **Atomic Compare-and-Publish:** GPS updates run an atomic Lua script that compares `recorded_at_epoch`. If the incoming point is newer/equal:
+  - Updates live key: `smartbus:trip:{trip_id}:live`
+  - Publishes payload on: `smartbus:trip:{trip_id}:location`
+  - Returns `1`
+- **Out-of-Order Guarantee:** Older points arriving late are saved to PostgreSQL but are **never** published over WebSockets or stored in Redis live state.
 
-### 3. Fault-Tolerance & Lifecycle Cleanup
-- **Fault-Tolerant Ingestion:** If Redis is temporarily unavailable or encounters an error, the PostgreSQL write remains committed, the point is preserved, and the GPS ingestion endpoint returns `201 Created`.
-- **Trip Lifecycle Cleanup:** When a trip transitions to `COMPLETED` (`POST /api/v1/trips/{id}/end`) or `CANCELLED` (`POST /api/v1/trips/{id}/cancel`), the Redis live location key is automatically deleted to prevent stale state.
+### 2. Connection Lifecycle & Initial State
+- **Endpoint:** `WS /api/v1/ws/trips/{trip_id}`
+- **Authentication:** Token via `Authorization: Bearer <token>` header or `?token=<token>` query param.
+- **Authorization:** `ADMIN` or assigned `DRIVER` (`trip.driver_id == current_user.id` and `trip.bus_id == current_user.assigned_bus_id`).
+- **Initial State Delivery:** When a client connects:
+  - If Redis already has live state, sends current live location JSON immediately.
+  - If no GPS points ingested yet, sends `{"type": "connected", "trip_id": "<id>"}`.
+- **Trip Lifecycle Enforcement:** Connections to `COMPLETED` or `CANCELLED` trips are rejected with policy close code `1008`. When a trip ends, a `{"type": "trip_ended"}` message is broadcast and Redis state is deleted.
 
 ---
 
 ## API Endpoints & Interactive Docs
 
-| Endpoint | Method | Access Level | Description |
+| Endpoint | Method / Protocol | Access Level | Description |
 | :--- | :--- | :--- | :--- |
 | `/` | `GET` | Public | Root welcome message |
 | `/api/v1/health` | `GET` | Public | Service operational health check |
@@ -196,6 +196,7 @@ Driver GPS Request
 | `/api/v1/trips/{trip_id}/gps` | `POST` | Assigned `DRIVER` only | Ingest GPS location telemetry |
 | `/api/v1/trips/{trip_id}/gps` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve chronological GPS history |
 | `/api/v1/trips/{trip_id}/live` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve latest cached live location |
+| `/api/v1/ws/trips/{trip_id}` | `WebSocket` | `ADMIN` or Assigned `DRIVER` | Realtime live location telemetry stream |
 | `/docs` | `GET` | Public | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Public | Interactive ReDoc documentation |
 | `/openapi.json` | `GET` | Public | OpenAPI 3.0 schema |

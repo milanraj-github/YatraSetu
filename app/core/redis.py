@@ -23,6 +23,12 @@ def get_redis_client() -> Redis:
     return _redis_client
 
 
+def set_redis_client(client: Optional[Redis]) -> None:
+    """Set or override the global Redis client instance (useful for test isolation)."""
+    global _redis_client
+    _redis_client = client
+
+
 async def get_redis() -> AsyncGenerator[Redis, None]:
     """FastAPI dependency for accessing the shared Redis client."""
     client = get_redis_client()

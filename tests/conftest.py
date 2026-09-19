@@ -5,7 +5,9 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from starlette.websockets import WebSocketDisconnect
 
+from app.core.redis import set_redis_client
 from app.db.database import engine
 from app.main import app
 
@@ -43,10 +45,14 @@ class FakeAsyncRedis:
                 count += 1
         return count
 
-    async def eval(self, script: str, numkeys: int, key: str, data_json: str, new_epoch_str: str):
+    async def eval(self, script: str, numkeys: int, *args):
         if not self.is_healthy:
             raise ConnectionError("Simulated Redis connection failure")
-        new_epoch = float(new_epoch_str)
+        keys = args[:numkeys]
+        argv = args[numkeys:]
+        key = keys[0]
+        data_json = argv[0]
+        new_epoch = float(argv[1])
         current = self._store.get(key)
         if current:
             current_obj = json.loads(current)
@@ -62,6 +68,82 @@ class FakeAsyncRedis:
 
     async def aclose(self):
         self._store.clear()
+
+
+class ASGIWebSocketTestSession:
+    """In-memory asyncio-native WebSocket test session for ASGI applications."""
+
+    def __init__(self, application, path: str, headers: dict = None, query_params: dict = None):
+        self.application = application
+        self.path = path
+        self.headers = headers or {}
+        self.query_params = query_params or {}
+        self.incoming_queue = asyncio.Queue()
+        self.outgoing_queue = asyncio.Queue()
+        self.task = None
+        self.close_code = None
+
+    async def __aenter__(self):
+        raw_headers = [(k.lower().encode("ascii"), v.encode("ascii")) for k, v in self.headers.items()]
+        query_string = "&".join(f"{k}={v}" for k, v in self.query_params.items()).encode("ascii")
+        scope = {
+            "type": "websocket",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "scheme": "ws",
+            "path": self.path,
+            "raw_path": self.path.encode("ascii"),
+            "query_string": query_string,
+            "headers": raw_headers,
+            "client": ("127.0.0.1", 50000),
+            "server": ("testserver", 80),
+            "subprotocols": [],
+        }
+
+        async def receive():
+            return await self.incoming_queue.get()
+
+        async def send(message):
+            if message["type"] == "websocket.close":
+                self.close_code = message.get("code", 1000)
+            await self.outgoing_queue.put(message)
+
+        self.task = asyncio.create_task(self.application(scope, receive, send))
+        await self.incoming_queue.put({"type": "websocket.connect"})
+
+        msg = await self.outgoing_queue.get()
+        if msg["type"] == "websocket.close":
+            self.close_code = msg.get("code", 1000)
+            raise WebSocketDisconnect(code=self.close_code)
+        elif msg["type"] == "websocket.accept":
+            return self
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.incoming_queue.put({"type": "websocket.disconnect", "code": 1000})
+        if self.task:
+            try:
+                await asyncio.wait_for(self.task, timeout=1.0)
+            except Exception:
+                self.task.cancel()
+
+    async def receive_json(self, timeout: float = 2.0) -> dict:
+        msg = await asyncio.wait_for(self.outgoing_queue.get(), timeout=timeout)
+        if msg["type"] == "websocket.close":
+            self.close_code = msg.get("code", 1000)
+            raise WebSocketDisconnect(code=self.close_code)
+        if msg["type"] == "websocket.send":
+            text = msg.get("text")
+            if text is not None:
+                return json.loads(text)
+            return msg.get("bytes")
+        return msg
+
+    async def send_text(self, text: str):
+        await self.incoming_queue.put({"type": "websocket.receive", "text": text})
+
+    async def send_json(self, data: dict):
+        await self.incoming_queue.put({"type": "websocket.receive", "text": json.dumps(data)})
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -82,18 +164,18 @@ async def cleanup_db_pool():
 def fake_redis():
     """Fixture providing a fresh in-memory Redis test client."""
     client = FakeAsyncRedis()
-    with patch("app.core.redis.get_redis_client", return_value=client), \
-         patch("app.services.gps_service.get_redis_client", return_value=client):
-        yield client
+    set_redis_client(client)
+    yield client
+    set_redis_client(None)
 
 
 @pytest_asyncio.fixture(autouse=True)
 def auto_mock_redis():
     """Autouse fixture ensuring Redis is safely mocked for all tests by default."""
     client = FakeAsyncRedis()
-    with patch("app.core.redis.get_redis_client", return_value=client), \
-         patch("app.services.gps_service.get_redis_client", return_value=client):
-        yield client
+    set_redis_client(client)
+    yield client
+    set_redis_client(None)
 
 
 @pytest_asyncio.fixture

@@ -10,6 +10,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.rbac import router as rbac_router
 from app.api.v1.routes import router as routes_router
 from app.api.v1.trips import router as trips_router
+from app.api.v1.ws import router as ws_router
 from app.core.config import settings
 
 
@@ -39,6 +40,7 @@ app.include_router(boarding_points_router, prefix="/api/v1")
 app.include_router(drivers_router, prefix="/api/v1")
 app.include_router(trips_router, prefix="/api/v1")
 app.include_router(gps_router, prefix="/api/v1")
+app.include_router(ws_router, prefix="/api/v1")
 
 
 @app.get(

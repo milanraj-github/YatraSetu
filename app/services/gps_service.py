@@ -13,12 +13,14 @@ from app.models.location import LocationPing
 from app.models.trip import Trip
 from app.models.user import User
 from app.schemas.gps import LiveLocationResponse, LocationPingCreate
+from app.services.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
-# Lua script to atomically update live location if new recorded_at >= current recorded_at
+# Lua script to atomically update live location and publish to channel if new recorded_at >= current recorded_at
 LUA_UPDATE_LIVE_LOCATION = """
 local key = KEYS[1]
+local channel = KEYS[2]
 local new_data = ARGV[1]
 local new_epoch = tonumber(ARGV[2])
 
@@ -28,12 +30,14 @@ if current then
     local current_epoch = tonumber(current_obj.recorded_at_epoch or 0)
     if new_epoch >= current_epoch then
         redis.call('SET', key, new_data)
+        redis.call('PUBLISH', channel, new_data)
         return 1
     else
         return 0
     end
 else
     redis.call('SET', key, new_data)
+    redis.call('PUBLISH', channel, new_data)
     return 1
 end
 """
@@ -42,6 +46,11 @@ end
 def get_live_location_key(trip_id: uuid.UUID) -> str:
     """Return the standard Redis key for a trip's live location."""
     return f"smartbus:trip:{trip_id}:live"
+
+
+def get_location_channel(trip_id: uuid.UUID) -> str:
+    """Return the Redis Pub/Sub channel for a trip's live location."""
+    return f"smartbus:trip:{trip_id}:location"
 
 
 async def update_trip_live_location(
@@ -56,10 +65,11 @@ async def update_trip_live_location(
     speed_mps: Optional[float] = None,
     heading_degrees: Optional[float] = None,
 ) -> bool:
-    """Atomically update Redis live location for a trip without moving backwards in time."""
+    """Atomically update Redis live location and publish to channel without moving backwards in time."""
     try:
         redis_client = get_redis_client()
         key = get_live_location_key(trip_id)
+        channel = get_location_channel(trip_id)
 
         # Ensure recorded_at has timezone info for epoch calculation
         if recorded_at.tzinfo is None:
@@ -83,11 +93,17 @@ async def update_trip_live_location(
 
         result = await redis_client.eval(
             LUA_UPDATE_LIVE_LOCATION,
-            1,
+            2,
             key,
+            channel,
             json_payload,
             str(recorded_at_epoch),
         )
+
+        if result == 1:
+            # Broadcast to in-process active WebSocket connections
+            await ws_manager.broadcast_to_trip(str(trip_id), payload)
+
         return bool(result == 1)
     except Exception as exc:
         logger.warning(f"Failed to update live location in Redis for trip {trip_id}: {exc}")
@@ -100,6 +116,11 @@ async def cleanup_trip_live_location(trip_id: uuid.UUID) -> None:
         redis_client = get_redis_client()
         key = get_live_location_key(trip_id)
         await redis_client.delete(key)
+        # Inform any connected WebSocket subscribers
+        await ws_manager.broadcast_to_trip(
+            str(trip_id),
+            {"type": "trip_ended", "trip_id": str(trip_id)},
+        )
     except Exception as exc:
         logger.warning(f"Failed to delete Redis live location for trip {trip_id}: {exc}")
 
@@ -160,7 +181,7 @@ async def ingest_location_ping(
     await db.commit()
     await db.refresh(location_ping)
 
-    # 6. Update Redis live location state asynchronously without blocking or failing DB record
+    # 6. Update Redis live location state and Pub/Sub channel
     await update_trip_live_location(
         trip_id=trip.id,
         driver_id=current_user.id,
