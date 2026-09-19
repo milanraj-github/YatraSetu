@@ -1,7 +1,7 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 4 Complete — Role-Based Access Control (RBAC) System.  
-> *(Note: Business entities like Bus, Route, and Trips belong to future phases).*
+> **Status:** Phase 5 Complete — Bus Management Module.  
+> *(Note: Routes, Stops, and Driver Assignment belong to future phases).*
 
 SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **ADMIN**, **DRIVER**, **STUDENT**, and **PARENT**.
 
@@ -14,7 +14,7 @@ SMARTBUS is a modern college campus transportation backend designed to support l
 - **Web Framework:** FastAPI
 - **ASGI Server:** Uvicorn
 - **Authentication:** Firebase Authentication (Firebase ID Token verification)
-- **Authorization (RBAC):** PostgreSQL `User.role` + FastAPI dependency injection (`require_role`, `require_roles`)
+- **Authorization (RBAC):** PostgreSQL `User.role` + FastAPI dependency injection (`require_role(UserRole.ADMIN)`)
 - **ORM:** SQLAlchemy 2.0 (Async Engine & AsyncSession)
 - **Database Driver:** asyncpg
 - **Database Engine:** PostgreSQL 16+
@@ -31,7 +31,7 @@ smartbus-backend/
 │
 ├── app/
 │   ├── __init__.py
-│   ├── main.py              # FastAPI application entry point & router mounting
+│   ├── main.py              # FastAPI entry point & router registration
 │   │
 │   ├── core/
 │   │   ├── __init__.py
@@ -47,11 +47,17 @@ smartbus-backend/
 │   ├── models/
 │   │   ├── __init__.py      # Model exports
 │   │   ├── enums.py         # UserRole enum (ADMIN, DRIVER, STUDENT, PARENT)
-│   │   └── user.py          # User entity with UUID, firebase_uid, email, role, timestamps
+│   │   ├── user.py          # User entity (assigned_bus_id foreign key)
+│   │   └── bus.py           # Bus entity (bus_number, registration_number, capacity)
 │   │
 │   ├── schemas/
 │   │   ├── __init__.py      # Schema exports
-│   │   └── user.py          # User Pydantic v2 schemas + student domain validation
+│   │   ├── user.py          # User Pydantic v2 schemas + student domain validation
+│   │   └── bus.py           # Bus Pydantic v2 schemas (Create, Update, Response)
+│   │
+│   ├── services/
+│   │   ├── __init__.py      # Service layer exports
+│   │   └── bus_service.py   # Bus CRUD operations and uniqueness conflict checks
 │   │
 │   └── api/
 │       ├── __init__.py
@@ -59,7 +65,8 @@ smartbus-backend/
 │           ├── __init__.py
 │           ├── auth.py      # Authentication router (/api/v1/auth/me)
 │           ├── health.py    # Health check routers (/api/v1/health, /api/v1/health/db)
-│           └── rbac.py      # RBAC verification endpoints
+│           ├── rbac.py      # RBAC verification endpoints
+│           └── buses.py     # Bus management CRUD API (/api/v1/buses)
 │
 ├── alembic/
 │   ├── versions/            # Database migration scripts
@@ -74,7 +81,8 @@ smartbus-backend/
 │   ├── test_database.py     # Database connectivity & migration tests
 │   ├── test_user.py         # User model, constraints & student domain tests
 │   ├── test_auth.py         # Firebase auth & current-user endpoint tests
-│   └── test_rbac.py         # RBAC single & multi-role permission tests
+│   ├── test_rbac.py         # RBAC single & multi-role permission tests
+│   └── test_buses.py        # Bus model, validation, CRUD, and safe deactivation tests
 │
 ├── .env                     # Local secrets & configs (git-ignored)
 ├── .env.example             # Environment variable template
@@ -88,21 +96,22 @@ smartbus-backend/
 
 ---
 
-## Authentication vs Authorization Architecture
+## Bus Management Module (Phase 5)
 
-1. **Authentication (Who you are):**
-   - Verified via Firebase ID Token (`Bearer <token>`).
-   - Resolves to a `firebase_uid`.
-   - Client-provided roles or user IDs are never trusted as proof of identity.
+### 1. Database Model & Relationship
+- **`buses` table:**
+  - `id`: UUID (Primary Key)
+  - `bus_number`: String(50), Unique, Indexed, Non-null
+  - `registration_number`: String(50), Unique, Indexed, Non-null
+  - `capacity`: Integer, Positive (`CHECK (capacity > 0)`)
+  - `is_active`: Boolean, default `true`
+  - `created_at`, `updated_at`: Timezone-aware Timestamps
+- **`User <-> Bus` Relationship:**
+  - `users.assigned_bus_id`: UUID Foreign Key referencing `buses.id` (`ON DELETE SET NULL`), enabling driver assignment in later phases.
 
-2. **Authorization (What you can do):**
-   - Resolved strictly from PostgreSQL `users.role`.
-   - Roles: `ADMIN`, `DRIVER`, `STUDENT`, `PARENT`.
-   - Enforced cleanly via FastAPI dependencies:
-     - `require_role(UserRole.ADMIN)`
-     - `require_roles(UserRole.ADMIN, UserRole.DRIVER)`
-   - Missing/invalid authentication $\rightarrow$ `HTTP 401 Unauthorized`.
-   - Insufficient permissions $\rightarrow$ `HTTP 403 Forbidden`.
+### 2. RBAC & Access Control
+- All Bus CRUD endpoints are strictly restricted to users with the **`ADMIN`** role.
+- Deletions are implemented as **safe soft deactivations** (`is_active = false`) to preserve data integrity for historical records.
 
 ---
 
@@ -119,6 +128,11 @@ smartbus-backend/
 | `/api/v1/rbac/student-test` | `GET` | `STUDENT` only | Student RBAC verification |
 | `/api/v1/rbac/parent-test` | `GET` | `PARENT` only | Parent RBAC verification |
 | `/api/v1/rbac/admin-driver-test` | `GET` | `ADMIN` or `DRIVER` | Shared multi-role RBAC verification |
+| `/api/v1/buses` | `POST` | `ADMIN` only | Create a new bus |
+| `/api/v1/buses` | `GET` | `ADMIN` only | List buses with pagination |
+| `/api/v1/buses/{bus_id}` | `GET` | `ADMIN` only | Retrieve bus details by ID |
+| `/api/v1/buses/{bus_id}` | `PATCH` | `ADMIN` only | Update bus details |
+| `/api/v1/buses/{bus_id}` | `DELETE` | `ADMIN` only | Safely deactivate bus (`is_active = false`) |
 | `/docs` | `GET` | Public | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Public | Interactive ReDoc documentation |
 | `/openapi.json` | `GET` | Public | OpenAPI 3.0 schema |

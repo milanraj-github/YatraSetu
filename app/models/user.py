@@ -1,11 +1,16 @@
+from __future__ import annotations
 import uuid
 from datetime import datetime
-from sqlalchemy import DateTime, Enum as SQLEnum, String, func
+from typing import TYPE_CHECKING, Optional
+from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import UserRole
+
+if TYPE_CHECKING:
+    from app.models.bus import Bus
 
 
 class User(Base):
@@ -38,6 +43,19 @@ class User(Base):
         SQLEnum(UserRole, name="user_role_enum", native_enum=True),
         nullable=False,
     )
+
+    # Optional assignment to a Bus for driver role
+    assigned_bus_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("buses.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    assigned_bus: Mapped[Optional[Bus]] = relationship(
+        "Bus",
+        back_populates="drivers",
+        foreign_keys=[assigned_bus_id],
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

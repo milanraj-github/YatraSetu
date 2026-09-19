@@ -1,6 +1,6 @@
 """Database package for SMARTBUS backend."""
 from app.db.base import Base
 from app.db.database import async_session_factory, engine, get_db
-from app.models import User, UserRole
+from app.models import Bus, User, UserRole
 
-__all__ = ["Base", "engine", "async_session_factory", "get_db", "User", "UserRole"]
+__all__ = ["Base", "engine", "async_session_factory", "get_db", "User", "UserRole", "Bus"]
