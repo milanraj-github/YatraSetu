@@ -1,9 +1,9 @@
-"""Services package."""
 from app.services import (
     boarding_point_service,
     bus_service,
     driver_service,
     gps_service,
+    parent_child_service,
     route_service,
     route_stop_service,
     trip_service,
@@ -17,4 +17,6 @@ __all__ = [
     "driver_service",
     "trip_service",
     "gps_service",
+    "parent_child_service",
 ]
+

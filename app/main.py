@@ -7,6 +7,8 @@ from app.api.v1.buses import router as buses_router
 from app.api.v1.drivers import router as drivers_router
 from app.api.v1.gps import router as gps_router
 from app.api.v1.health import router as health_router
+from app.api.v1.parent_links import router as parent_links_router
+from app.api.v1.parents import router as parents_router
 from app.api.v1.rbac import router as rbac_router
 from app.api.v1.routes import router as routes_router
 from app.api.v1.trips import router as trips_router
@@ -41,6 +43,9 @@ app.include_router(drivers_router, prefix="/api/v1")
 app.include_router(trips_router, prefix="/api/v1")
 app.include_router(gps_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/api/v1")
+app.include_router(parent_links_router, prefix="/api/v1")
+app.include_router(parents_router, prefix="/api/v1")
+
 
 
 @app.get(

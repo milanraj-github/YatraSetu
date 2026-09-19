@@ -116,8 +116,9 @@ def test_bus_schema_invalid_capacity_rejected():
 async def test_create_bus_admin_success(async_client: AsyncClient):
     """ADMIN can create a new bus (201 Created)."""
     admin = await create_test_user(UserRole.ADMIN, "admin_create")
-    bus_num = f"BUS-{uuid.uuid4().hex[:6].upper()}"
-    reg_num = f"KA-20-{uuid.uuid4().hex[:4].upper()}"
+    bus_num = f"BUS-{uuid.uuid4().hex[:8].upper()}"
+    reg_num = f"KA-20-{uuid.uuid4().hex[:8].upper()}"
+
 
     with patch("app.core.security.verify_firebase_token") as mock_verify:
         mock_verify.return_value = {"uid": admin.firebase_uid, "email": admin.email}

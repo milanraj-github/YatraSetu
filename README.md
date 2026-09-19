@@ -1,7 +1,8 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 11 Complete — Offline GPS Batch Sync & Idempotency.  
-> *(Note: Batch GPS sync with UUID idempotency complete. PostGIS, Geofencing, ETA, Notifications, Emergency/SOS, and Parent Linking belong to future phases).*
+> **Status:** Phase 12 Complete — Parent–Child Linking, Approval Workflow & Live Tracking.  
+> *(Note: Parent linking and approved live tracking complete. PostGIS, Geofencing, ETA, Notifications, and Emergency/SOS belong to future phases).*
+
 
 
 SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **ADMIN**, **DRIVER**, **STUDENT**, and **PARENT**.
@@ -199,9 +200,44 @@ Driver GPS Request
 | `/api/v1/trips/{trip_id}/gps` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve chronological GPS history |
 | `/api/v1/trips/{trip_id}/live` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve latest cached live location |
 | `/api/v1/ws/trips/{trip_id}` | `WebSocket` | `ADMIN` or Assigned `DRIVER` | Realtime live location telemetry stream |
+| `/api/v1/auth/register-parent` | `POST` | Authenticated | Register parent account and initiate student link |
+| `/api/v1/parent-links` | `GET` | `STUDENT` only | List student's received parent link requests |
+| `/api/v1/parent-links/{id}/approve` | `POST` | `STUDENT` only | Approve pending parent link request |
+| `/api/v1/parent-links/{id}/reject` | `POST` | `STUDENT` only | Reject pending parent link request |
+| `/api/v1/parent/children` | `GET` | `PARENT` only | List approved linked children |
+| `/api/v1/parent/children/{id}/live` | `GET` | `PARENT` only | Track active bus live location for approved child |
 | `/docs` | `GET` | Public | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Public | Interactive ReDoc documentation |
 | `/openapi.json` | `GET` | Public | OpenAPI 3.0 schema |
+
+---
+
+## Parent–Child Linking & Approval Workflow (Phase 12)
+
+```text
+Parent Mobile App                          Student Web/App
+       │                                          │
+       ├──► 1. POST /api/v1/auth/register-parent   │
+       │    (email, full_name, child_email)       │
+       │                                          │
+       ▼ (ParentLinkRequest: PENDING)             ▼
+                                           2. GET /api/v1/parent-links
+                                           3. POST /api/v1/parent-links/{id}/approve
+                                                  │
+                                                  ▼
+                                           ParentChildren (APPROVED)
+                                                  │
+       ◄──────────────────────────────────────────┘
+       │
+       ├──► 4. GET /api/v1/parent/children (Lists approved children)
+       │
+       └──► 5. GET /api/v1/parent/children/{student_id}/live
+            (Resolves child's assigned bus -> active trip -> Redis live telemetry)
+```
+
+- **Authorization Boundary:** Knowing a student's email, UUID, or trip ID gives **zero** access to location. Only an `APPROVED` row in `ParentChildren` unlocks tracking.
+- **Student Privacy:** Only the referenced student can approve or reject a link request. Rejected or pending requests never reveal telemetry.
+- **Trip Resolution:** Parents don't need driver IDs or trip IDs. The backend resolves `student.assigned_bus_id` to the currently `IN_PROGRESS` trip and fetches real-time Redis telemetry.
 
 ---
 
@@ -227,6 +263,7 @@ FastAPI Backend
 - **Idempotency Guarantee:** Each queued point carries a client-generated UUID `client_id`. If mobile uploads retry due to transient connection dropouts, already inserted points are marked as `duplicates` without failing the batch.
 - **Out-of-Order Handling:** PostgreSQL retains all accepted historical points chronologically, while Redis Lua script guarantees the live pointer moves monotonically forward.
 - **Fault Tolerance:** Temporary Redis outages do not fail or roll back the primary PostgreSQL transaction.
+
 
 
 ---

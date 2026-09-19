@@ -15,6 +15,11 @@ from app.schemas.gps import (
     LocationPingCreate,
     LocationPingResponse,
 )
+from app.schemas.parent_child import (
+    ParentChildResponse,
+    ParentLinkRequestResponse,
+    ParentRegisterRequest,
+)
 from app.schemas.route import RouteBase, RouteCreate, RouteResponse, RouteUpdate
 from app.schemas.route_stop import (
     RouteStopBase,
@@ -64,5 +69,9 @@ __all__ = [
     "GPSPointSyncItem",
     "GPSBatchSyncRequest",
     "GPSBatchSyncResponse",
+    "ParentRegisterRequest",
+    "ParentLinkRequestResponse",
+    "ParentChildResponse",
 ]
+
 
