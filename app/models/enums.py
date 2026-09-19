@@ -8,3 +8,12 @@ class UserRole(str, Enum):
     DRIVER = "DRIVER"
     STUDENT = "STUDENT"
     PARENT = "PARENT"
+
+
+class TripStatus(str, Enum):
+    """Lifecycle status of a bus trip."""
+
+    SCHEDULED = "SCHEDULED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"

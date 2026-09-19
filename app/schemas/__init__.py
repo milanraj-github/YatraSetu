@@ -6,6 +6,7 @@ from app.schemas.boarding_point import (
     BoardingPointUpdate,
 )
 from app.schemas.bus import BusBase, BusCreate, BusResponse, BusUpdate
+from app.schemas.driver import DriverAssignmentResponse
 from app.schemas.route import RouteBase, RouteCreate, RouteResponse, RouteUpdate
 from app.schemas.route_stop import (
     RouteStopBase,
@@ -14,6 +15,7 @@ from app.schemas.route_stop import (
     RouteStopResponse,
     RouteStopUpdate,
 )
+from app.schemas.trip import TripCreate, TripResponse
 from app.schemas.user import (
     STUDENT_EMAIL_DOMAIN,
     UserBase,
@@ -45,4 +47,7 @@ __all__ = [
     "RouteStopUpdate",
     "RouteStopOrderUpdate",
     "RouteStopResponse",
+    "DriverAssignmentResponse",
+    "TripCreate",
+    "TripResponse",
 ]

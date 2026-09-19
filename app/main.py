@@ -4,9 +4,11 @@ from pydantic import BaseModel
 from app.api.v1.auth import router as auth_router
 from app.api.v1.boarding_points import router as boarding_points_router
 from app.api.v1.buses import router as buses_router
+from app.api.v1.drivers import router as drivers_router
 from app.api.v1.health import router as health_router
 from app.api.v1.rbac import router as rbac_router
 from app.api.v1.routes import router as routes_router
+from app.api.v1.trips import router as trips_router
 from app.core.config import settings
 
 
@@ -33,6 +35,8 @@ app.include_router(rbac_router, prefix="/api/v1")
 app.include_router(buses_router, prefix="/api/v1")
 app.include_router(routes_router, prefix="/api/v1")
 app.include_router(boarding_points_router, prefix="/api/v1")
+app.include_router(drivers_router, prefix="/api/v1")
+app.include_router(trips_router, prefix="/api/v1")
 
 
 @app.get(
