@@ -7,6 +7,7 @@ from app.schemas.boarding_point import (
 )
 from app.schemas.bus import BusBase, BusCreate, BusResponse, BusUpdate
 from app.schemas.driver import DriverAssignmentResponse
+from app.schemas.gps import LocationPingCreate, LocationPingResponse
 from app.schemas.route import RouteBase, RouteCreate, RouteResponse, RouteUpdate
 from app.schemas.route_stop import (
     RouteStopBase,
@@ -50,4 +51,6 @@ __all__ = [
     "DriverAssignmentResponse",
     "TripCreate",
     "TripResponse",
+    "LocationPingCreate",
+    "LocationPingResponse",
 ]

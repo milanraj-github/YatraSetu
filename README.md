@@ -1,7 +1,7 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 7 Complete — Driver ↔ Bus Assignment & Trip Lifecycle Management.  
-> *(Note: GPS Ingestion, Redis, WebSockets, PostGIS, and Emergency systems belong to future phases).*
+> **Status:** Phase 8 Complete — GPS Ingestion & Historical Telemetry Persistence.  
+> *(Note: Redis, WebSockets, PostGIS, Geofencing, ETA, and Emergency systems belong to future phases).*
 
 SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **ADMIN**, **DRIVER**, **STUDENT**, and **PARENT**.
 
@@ -52,7 +52,8 @@ smartbus-backend/
 │   │   ├── route.py         # Route entity (code, name, description)
 │   │   ├── boarding_point.py# BoardingPoint entity (coordinates & address)
 │   │   ├── route_stop.py    # RouteStop association model (ordered stops)
-│   │   └── trip.py          # Trip entity (route, bus, driver, lifecycle status)
+│   │   ├── trip.py          # Trip entity (route, bus, driver, lifecycle status)
+│   │   └── location.py      # LocationPing entity (GPS telemetry & coordinates)
 │   │
 │   ├── schemas/
 │   │   ├── __init__.py      # Schema exports
@@ -62,7 +63,8 @@ smartbus-backend/
 │   │   ├── boarding_point.py# BoardingPoint schemas (latitude/longitude checks)
 │   │   ├── route_stop.py    # RouteStop schemas (ordering & offset)
 │   │   ├── driver.py        # Driver assignment schemas
-│   │   └── trip.py          # Trip creation & response schemas
+│   │   ├── trip.py          # Trip creation & response schemas
+│   │   └── gps.py           # GPS LocationPing creation & response schemas
 │   │
 │   ├── services/
 │   │   ├── __init__.py      # Service layer exports
@@ -71,7 +73,8 @@ smartbus-backend/
 │   │   ├── boarding_point_service.py # Boarding point operations
 │   │   ├── route_stop_service.py     # Stop sequencing and safe reordering
 │   │   ├── driver_service.py         # Driver bus assignment & verification
-│   │   └── trip_service.py           # Trip lifecycle & driver ownership
+│   │   ├── trip_service.py           # Trip lifecycle & driver ownership
+│   │   └── gps_service.py            # GPS ingestion & historical query service
 │   │
 │   └── api/
 │       ├── __init__.py
@@ -84,7 +87,8 @@ smartbus-backend/
 │           ├── routes.py          # Routes & Route Stops API (/api/v1/routes)
 │           ├── boarding_points.py # Boarding Points API (/api/v1/boarding-points)
 │           ├── drivers.py         # Driver bus assignment API (/api/v1/drivers)
-│           └── trips.py           # Trip management & lifecycle API (/api/v1/trips)
+│           ├── trips.py           # Trip management & lifecycle API (/api/v1/trips)
+│           └── gps.py             # GPS Ingestion & History API (/api/v1/trips/{id}/gps)
 │
 ├── alembic/
 │   ├── versions/            # Database migration scripts
@@ -105,7 +109,8 @@ smartbus-backend/
 │   ├── test_boarding_points.py # Boarding point coordinates & CRUD tests
 │   ├── test_route_stops.py  # Route-stop sequencing & 2-phase reordering tests
 │   ├── test_drivers.py      # Driver assignment and unassignment tests
-│   └── test_trips.py        # Trip creation, driver ownership, and lifecycle tests
+│   ├── test_trips.py        # Trip creation, driver ownership, and lifecycle tests
+│   └── test_gps.py          # GPS ingestion, validation, out-of-order & duplicate retention tests
 │
 ├── .env                     # Local secrets & configs (git-ignored)
 ├── .env.example             # Environment variable template
@@ -119,29 +124,29 @@ smartbus-backend/
 
 ---
 
-## Driver Assignment & Trip Lifecycle (Phase 7)
+## GPS Ingestion & Telemetry (Phase 8)
 
-### 1. Database Model & Relationships
-- **Driver Model:** Standard `User` entity where `role == UserRole.DRIVER` and `assigned_bus_id` references `buses.id`.
-- **`trips` Table:**
+### 1. Database Model & Constraints
+- **`location_pings` Table:**
   - `id`: UUID (Primary Key)
-  - `route_id`: Foreign Key $\rightarrow$ `routes.id` (`ON DELETE RESTRICT`)
-  - `bus_id`: Foreign Key $\rightarrow$ `buses.id` (`ON DELETE RESTRICT`)
+  - `trip_id`: Foreign Key $\rightarrow$ `trips.id` (`ON DELETE RESTRICT`)
   - `driver_id`: Foreign Key $\rightarrow$ `users.id` (`ON DELETE RESTRICT`)
-  - `status`: Enum (`SCHEDULED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`), default `SCHEDULED`
-  - `scheduled_start_at`: Timezone-aware Timestamp (optional)
-  - `actual_start_at`: Timezone-aware Timestamp (set on trip start)
-  - `actual_end_at`: Timezone-aware Timestamp (set on trip end)
-  - `created_at`, `updated_at`: Timezone-aware Timestamps
+  - `latitude`: Float with Check (`-90.0 <= latitude <= 90.0`)
+  - `longitude`: Float with Check (`-180.0 <= longitude <= 180.0`)
+  - `recorded_at`: Timezone-aware Timestamp (Device timestamp)
+  - `received_at`: Timezone-aware Timestamp (Server-generated ingestion timestamp)
+  - `accuracy_meters`: Float, Check (`accuracy_meters IS NULL OR accuracy_meters >= 0`)
+  - `speed_mps`: Float, Check (`speed_mps IS NULL OR speed_mps >= 0`)
+  - `heading_degrees`: Float, Check (`heading_degrees IS NULL OR (heading_degrees >= 0 AND heading_degrees < 360)`)
+  - `created_at`: Timezone-aware Timestamp
+  - Composite Index: `(trip_id, recorded_at)`
 
-### 2. Driver Ownership & Safety Rules
-- **Trip Creation Validation:** Verifies route and bus are active, driver has `DRIVER` role, and driver is actively assigned to the specified bus (`driver.assigned_bus_id == trip.bus_id`).
-- **Driver Ownership Enforcement:** A driver can only view their own trips and can only start/end a trip if `trip.driver_id == current_user.id` AND `trip.bus_id == current_user.assigned_bus_id`.
-- **Lifecycle State Machine:**
-  - `SCHEDULED` $\rightarrow$ `IN_PROGRESS` (Driver or Admin)
-  - `IN_PROGRESS` $\rightarrow$ `COMPLETED` (Driver or Admin)
-  - `SCHEDULED` $\rightarrow$ `CANCELLED` (Admin only)
-  - Invalid state transitions return `409 Conflict`.
+### 2. Driver Ownership & Ingestion Rules
+- **Driver Role Enforcement:** Only authenticated `DRIVER` users may submit GPS telemetry. Admins, students, and parents cannot submit GPS points.
+- **Ownership Verification:** The authenticated driver must be assigned to the trip (`trip.driver_id == current_user.id`) and currently assigned to that trip's bus (`trip.bus_id == current_user.assigned_bus_id`).
+- **Trip Status Requirement:** GPS points are accepted only when `trip.status == TripStatus.IN_PROGRESS`. Attempts to submit GPS for `SCHEDULED`, `COMPLETED`, or `CANCELLED` trips return `409 Conflict`.
+- **Server Timestamps:** `received_at` is generated securely on the server. Clients cannot spoof `received_at`.
+- **Out-of-Order & Duplicate Retention:** Out-of-order and duplicate GPS points are persisted without deletion or overwriting to maintain comprehensive audit history. Historical queries order points by `recorded_at ASC, received_at ASC, id ASC`.
 
 ---
 
@@ -172,6 +177,8 @@ smartbus-backend/
 | `/api/v1/trips/{id}/start` | `POST` | `ADMIN` or Assigned `DRIVER` | Start a scheduled trip |
 | `/api/v1/trips/{id}/end` | `POST` | `ADMIN` or Assigned `DRIVER` | End an in-progress trip |
 | `/api/v1/trips/{id}/cancel` | `POST` | `ADMIN` only | Cancel a scheduled trip |
+| `/api/v1/trips/{trip_id}/gps` | `POST` | Assigned `DRIVER` only | Ingest GPS location telemetry |
+| `/api/v1/trips/{trip_id}/gps` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve chronological GPS history |
 | `/docs` | `GET` | Public | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Public | Interactive ReDoc documentation |
 | `/openapi.json` | `GET` | Public | OpenAPI 3.0 schema |
