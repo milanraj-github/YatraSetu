@@ -1,23 +1,24 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 2 Complete — PostgreSQL + SQLAlchemy 2.0 Async + Alembic Database Foundation.  
-> *(Note: Business database models are NOT implemented yet. Only database connectivity & migration infrastructure are established).*
+> **Status:** Phase 3 Complete — User Model + Firebase Authentication Foundation.  
+> *(Note: Full RBAC authorization and role-based route access controls belong to Phase 4).*
 
-SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **Admin**, **Driver**, **Student**, and **Parent**.
+SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **ADMIN**, **DRIVER**, **STUDENT**, and **PARENT**.
 
 ---
 
 ## Architecture & Technology Stack
 
-### Phase 1 & 2 Completed Stack:
+### Phase 1, 2 & 3 Completed Stack:
 - **Language:** Python 3.11+
 - **Web Framework:** FastAPI
 - **ASGI Server:** Uvicorn
+- **Authentication:** Firebase Authentication (Firebase Admin SDK token verification)
 - **ORM:** SQLAlchemy 2.0 (Async Engine & AsyncSession)
 - **Database Driver:** asyncpg
 - **Database Engine:** PostgreSQL 16+
-- **Migrations:** Alembic (configured for async SQLAlchemy)
-- **Configuration & Validation:** Pydantic v2 & Pydantic Settings
+- **Migrations:** Alembic (async configuration)
+- **Configuration & Validation:** Pydantic v2, Pydantic Settings, email-validator
 - **Testing:** Pytest, pytest-asyncio, HTTPX
 
 ---
@@ -29,39 +30,53 @@ smartbus-backend/
 │
 ├── app/
 │   ├── __init__.py
-│   ├── main.py              # FastAPI application entry point
+│   ├── main.py              # FastAPI application entry point & router mounting
 │   │
 │   ├── core/
 │   │   ├── __init__.py
-│   │   └── config.py        # Pydantic v2 Settings (App & DB configs)
+│   │   ├── config.py        # Pydantic Settings (App, DB, and Firebase)
+│   │   ├── firebase.py      # Firebase Admin SDK init & ID token verification
+│   │   └── security.py      # Bearer auth & get_current_user dependencies
 │   │
 │   ├── db/
-│   │   ├── __init__.py      # DB package exports
-│   │   ├── base.py          # SQLAlchemy 2.0 DeclarativeBase (Base)
-│   │   └── database.py      # AsyncEngine, async_sessionmaker, get_db dependency
+│   │   ├── __init__.py      # DB exports (Base, engine, session factory, get_db)
+│   │   ├── base.py          # SQLAlchemy 2.0 DeclarativeBase
+│   │   └── database.py      # AsyncEngine & session handling
+│   │
+│   ├── models/
+│   │   ├── __init__.py      # Model exports
+│   │   ├── enums.py         # UserRole enum (ADMIN, DRIVER, STUDENT, PARENT)
+│   │   └── user.py          # User entity with UUID, firebase_uid, email, role, timestamps
+│   │
+│   ├── schemas/
+│   │   ├── __init__.py      # Schema exports
+│   │   └── user.py          # User Pydantic v2 schemas + student domain validation
 │   │
 │   └── api/
 │       ├── __init__.py
 │       └── v1/
 │           ├── __init__.py
-│           └── health.py    # Health routers (/api/v1/health, /api/v1/health/db)
+│           ├── auth.py      # Authentication router (/api/v1/auth/me)
+│           └── health.py    # Health check routers (/api/v1/health, /api/v1/health/db)
 │
 ├── alembic/
-│   ├── versions/            # Migration versions directory
+│   ├── versions/            # Database migration scripts
 │   ├── env.py               # Async migration environment runner
 │   ├── script.py.mako       # Migration template
 │   └── README
 │
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py          # Pytest async client & DB pool cleanup fixtures
-│   ├── test_health.py       # Root & API health tests
-│   └── test_database.py     # Database connectivity & Alembic tests
+│   ├── conftest.py          # Async test fixtures & Windows event loop setup
+│   ├── test_health.py       # Health check tests
+│   ├── test_database.py     # Database connectivity & migration tests
+│   ├── test_user.py         # User model, constraints & student domain tests
+│   └── test_auth.py         # Firebase auth & current-user endpoint tests
 │
-├── .env                     # Local development environment secrets (git-ignored)
+├── .env                     # Local secrets & configs (git-ignored)
 ├── .env.example             # Environment variable template
-├── .gitignore               # Git ignore rules
-├── alembic.ini              # Alembic configuration file
+├── .gitignore               # Git ignore rules (protects credentials and secrets)
+├── alembic.ini              # Alembic configuration
 ├── docker-compose.yml       # PostgreSQL 16 container definition
 ├── pytest.ini               # Pytest async configuration
 ├── requirements.txt         # Project dependencies
@@ -70,55 +85,39 @@ smartbus-backend/
 
 ---
 
+## Identity & Authentication Architecture
+
+### 1. Separation of Responsibilities
+- **Firebase Authentication:** Handles user identity credentials (email/password, OAuth logins, token issuance, password resets). Passwords and private credentials are never stored in the SMARTBUS database.
+- **SMARTBUS PostgreSQL (`users` table):** Stores application-level profile data (`id` (UUID), `firebase_uid` (indexed/unique), `email` (indexed/unique), `full_name`, `role`, `created_at`, `updated_at`).
+
+### 2. Student Domain Requirement
+- `STUDENT` accounts must use the college domain: `@sode-edu.in` (case-insensitive).
+- Non-student roles (`ADMIN`, `DRIVER`, `PARENT`) are not restricted to this domain.
+
+---
+
 ## Getting Started
 
 ### 1. Prerequisites
-- Python 3.11 or higher installed.
-- PostgreSQL 16+ installed locally OR Docker Desktop.
+- Python 3.11+
+- PostgreSQL 16+ running locally OR Docker Desktop.
 - Git installed.
 
----
+### 2. Virtual Environment & Dependencies
 
-### 2. Create and Activate a Virtual Environment
-
-**On Windows (PowerShell):**
-```powershell
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
+.\.venv\Scripts\Activate.ps1   # On Windows
+# or source .venv/bin/activate # On Linux/macOS
 
-**On Linux / macOS:**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
----
-
-### 3. Install Dependencies
-
-```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
+### 3. Environment Configuration
 
-### 4. Configure Environment Variables
-
-Copy `.env.example` to `.env` if not already present:
-
-**Windows:**
-```powershell
-copy .env.example .env
-```
-
-**Linux / macOS:**
-```bash
-cp .env.example .env
-```
-
-Default variables in `.env`:
+Copy `.env.example` to `.env`:
 ```env
 APP_NAME=SMARTBUS Backend
 APP_VERSION=0.1.0
@@ -131,48 +130,23 @@ POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=smartbus_db
 DATABASE_URL=postgresql+asyncpg://smartbus_user:smartbus_password@localhost:5432/smartbus_db
+
+# Firebase Authentication (Optional in local dev/mocked in tests)
+FIREBASE_CREDENTIALS_PATH=
+FIREBASE_PROJECT_ID=smartbus-campus
 ```
 
----
+### 4. Run Migrations
 
-### 5. Running PostgreSQL
-
-#### Option A: Using Docker Compose
-```bash
-docker compose up -d
-```
-To verify container status:
-```bash
-docker compose ps
-```
-
-#### Option B: Using Local PostgreSQL Service
-Ensure PostgreSQL service is running on port 5432 and database `smartbus_db` is created for `smartbus_user`.
-
----
-
-### 6. Database Migrations with Alembic
-
-Run pending migrations to the latest head:
 ```bash
 alembic upgrade head
 ```
 
-To create a new migration revision (in future phases):
-```bash
-alembic revision --autogenerate -m "migration_name"
-```
+### 5. Start Server
 
----
-
-### 7. Running the FastAPI Server
-
-Start Uvicorn with live reload:
 ```bash
 uvicorn app.main:app --reload
 ```
-
-The server will be available at `http://127.0.0.1:8000`.
 
 ---
 
@@ -182,16 +156,16 @@ The server will be available at `http://127.0.0.1:8000`.
 | :--- | :--- | :--- |
 | `/` | `GET` | Root welcome message |
 | `/api/v1/health` | `GET` | Service operational health check |
-| `/api/v1/health/db` | `GET` | PostgreSQL connectivity health check (`SELECT 1`) |
+| `/api/v1/health/db` | `GET` | Database connectivity health check (`SELECT 1`) |
+| `/api/v1/auth/me` | `GET` | Authenticated user profile (requires `Bearer <firebase_id_token>`) |
 | `/docs` | `GET` | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Interactive ReDoc documentation |
-| `/openapi.json` | `GET` | OpenAPI 3.0 schema |
+| `/openapi.json` | `GET` | OpenAPI 3.0 JSON schema |
 
 ---
 
 ## Running Automated Tests
 
-Run the test suite using Pytest:
 ```bash
 pytest -v
 ```

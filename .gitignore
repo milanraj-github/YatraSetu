@@ -13,6 +13,10 @@ env/
 .env
 .env.local
 .env.*.local
+*firebase*.json
+*service-account*.json
+*.pem
+*.key
 
 # Testing & coverage
 .pytest_cache/
