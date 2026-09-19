@@ -2,6 +2,7 @@ from app.services import (
     boarding_point_service,
     bus_service,
     driver_service,
+    eta_service,
     geofence_service,
     gps_service,
     parent_child_service,
@@ -20,6 +21,7 @@ __all__ = [
     "gps_service",
     "parent_child_service",
     "geofence_service",
+    "eta_service",
 ]
 
 

@@ -3,12 +3,13 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import require_role, require_roles
+from app.core.security import get_current_user, require_role, require_roles
 from app.db.database import get_db
 from app.models.enums import TripStatus, UserRole
 from app.models.user import User
+from app.schemas.eta import TripETAResponse
 from app.schemas.trip import TripCreate, TripResponse
-from app.services import trip_service
+from app.services import eta_service, trip_service
 
 router = APIRouter(prefix="/trips", tags=["Trip Management"])
 
@@ -87,6 +88,22 @@ async def get_trip_endpoint(
         )
 
     return TripResponse.model_validate(trip)
+
+
+@router.get(
+    "/{trip_id}/eta",
+    response_model=TripETAResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Trip ETA",
+    description="Calculate and retrieve baseline deterministic arrival times for all route stops on an active trip.",
+)
+async def get_trip_eta_endpoint(
+    trip_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TripETAResponse:
+    """Get estimated arrival times for route stops of an active trip."""
+    return await eta_service.get_trip_eta(db, trip_id, current_user)
 
 
 @router.post(

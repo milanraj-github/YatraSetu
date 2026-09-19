@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +38,15 @@ class Settings(BaseSettings):
     # Geofencing Configuration
     DEFAULT_GEOFENCE_RADIUS_METERS: float = 100.0
 
+    # Basic ETA Engine Configuration (baseline deterministic speed in m/s)
+    DEFAULT_ETA_SPEED_MPS: float = 8.0
+
+    @field_validator("DEFAULT_ETA_SPEED_MPS")
+    @classmethod
+    def validate_eta_speed(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("DEFAULT_ETA_SPEED_MPS must be strictly greater than 0")
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",

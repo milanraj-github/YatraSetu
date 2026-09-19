@@ -1,7 +1,7 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 13 Complete — PostGIS Spatial Foundation & Geofencing.  
-> *(Note: PostGIS spatial storage & geofence proximity calculations complete. FCM, Email, Notifications, ETA, and Emergency/SOS belong to future phases).*
+> **Status:** Phase 14 Complete — Basic ETA Engine.  
+> *(Note: Baseline deterministic ETA calculation using PostGIS ST_Distance and configurable average speed complete. FCM, Email, Notifications, and Emergency/SOS belong to future phases).*
 
 
 
@@ -196,6 +196,7 @@ Driver GPS Request
 | `/api/v1/trips/{id}/start` | `POST` | `ADMIN` or Assigned `DRIVER` | Start a scheduled trip |
 | `/api/v1/trips/{id}/end` | `POST` | `ADMIN` or Assigned `DRIVER` | End an in-progress trip & clean live cache |
 | `/api/v1/trips/{id}/cancel` | `POST` | `ADMIN` only | Cancel a scheduled trip & clean live cache |
+| `/api/v1/trips/{trip_id}/eta` | `GET` | Authenticated (RBAC protected) | Calculate baseline arrival time estimates for all route stops |
 | `/api/v1/trips/{trip_id}/gps` | `POST` | Assigned `DRIVER` only | Ingest single GPS location telemetry |
 | `/api/v1/trips/{trip_id}/gps/sync` | `POST` | Assigned `DRIVER` only | Ingest batch of offline-queued GPS points (1-500) with idempotency |
 | `/api/v1/trips/{trip_id}/gps` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve chronological GPS history |
@@ -210,6 +211,36 @@ Driver GPS Request
 | `/docs` | `GET` | Public | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Public | Interactive ReDoc documentation |
 | `/openapi.json` | `GET` | Public | OpenAPI 3.0 schema |
+
+---
+
+## Basic ETA Engine (Phase 14)
+
+```text
+Current Bus Live Position (lat, lon from Redis)
+       │
+       ├──► Query ordered RouteStops + BoardingPoints (ORDER BY stop_order ASC)
+       │
+       ├──► PostGIS ST_Distance(current_point, stop_location) -> distance_meters
+       │
+       ├──► ETA Calculation: eta_seconds = distance_meters / DEFAULT_ETA_SPEED_MPS
+       │
+       └──► Output: estimated_arrival_at = generated_at + timedelta(seconds=eta_seconds)
+```
+
+- **Deterministic Baseline Algorithm:** Computes travel times based on geodesic distance from current bus position to each route stop:
+  $$\text{ETA (seconds)} = \frac{\text{Distance (meters)}}{\text{DEFAULT\_ETA\_SPEED\_MPS}}$$
+- **Configurable Speed Parameter:** Baseline speed configured via `DEFAULT_ETA_SPEED_MPS = 8.0` (~28.8 km/h) in `Settings` with strict positive validation (`> 0.0`).
+- **Authorization Enforcements:**
+  - `ADMIN`: Allowed for all trips.
+  - `DRIVER`: Allowed only for their own assigned trip.
+  - `PARENT`: Allowed only if having an approved relationship with a student assigned to the operating bus.
+  - `STUDENT`: Allowed only if assigned to the operating bus.
+- **Trip Lifecycle Enforcement:** ETA calculations require the trip to be `IN_PROGRESS` (returns `409 Conflict` if `SCHEDULED`, `COMPLETED`, or `CANCELLED`).
+- **Technical Limitations & Scope:**
+  - **Baseline deterministic estimation** — provides predictable travel time approximations based on straight-line spatial distance.
+  - **No traffic or road-network graph routing** — does not incorporate OSM turn-by-turn road network geometry or live traffic telemetry.
+  - **No ML / AI prediction models** — does not attempt machine learning statistical duration predictions.
 
 ---
 

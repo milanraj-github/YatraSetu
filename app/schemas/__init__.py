@@ -15,6 +15,7 @@ from app.schemas.gps import (
     LocationPingCreate,
     LocationPingResponse,
 )
+from app.schemas.eta import StopETAResponse, TripETAResponse
 from app.schemas.parent_child import (
     ParentChildResponse,
     ParentLinkRequestResponse,
@@ -72,6 +73,8 @@ __all__ = [
     "ParentRegisterRequest",
     "ParentLinkRequestResponse",
     "ParentChildResponse",
+    "StopETAResponse",
+    "TripETAResponse",
 ]
 
 
