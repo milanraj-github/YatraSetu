@@ -8,6 +8,9 @@ from app.schemas.boarding_point import (
 from app.schemas.bus import BusBase, BusCreate, BusResponse, BusUpdate
 from app.schemas.driver import DriverAssignmentResponse
 from app.schemas.gps import (
+    GPSBatchSyncRequest,
+    GPSBatchSyncResponse,
+    GPSPointSyncItem,
     LiveLocationResponse,
     LocationPingCreate,
     LocationPingResponse,
@@ -58,4 +61,8 @@ __all__ = [
     "LocationPingCreate",
     "LocationPingResponse",
     "LiveLocationResponse",
+    "GPSPointSyncItem",
+    "GPSBatchSyncRequest",
+    "GPSBatchSyncResponse",
 ]
+

@@ -46,6 +46,12 @@ class LocationPing(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    client_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
     trip_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("trips.id", ondelete="RESTRICT"),
@@ -99,6 +105,6 @@ class LocationPing(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<LocationPing id={self.id} trip_id={self.trip_id} "
+            f"<LocationPing id={self.id} client_id={self.client_id} trip_id={self.trip_id} "
             f"lat={self.latitude} lon={self.longitude} recorded_at={self.recorded_at}>"
         )

@@ -1,7 +1,8 @@
 # SMARTBUS — Campus Bus Tracking, Safety & Emergency Backend
 
-> **Status:** Phase 10 Complete — Realtime WebSocket Telemetry Streaming via Redis Pub/Sub.  
-> *(Note: WebSockets live streaming complete. PostGIS, Geofencing, ETA, Notifications, Emergency/SOS, and Parent Linking belong to future phases).*
+> **Status:** Phase 11 Complete — Offline GPS Batch Sync & Idempotency.  
+> *(Note: Batch GPS sync with UUID idempotency complete. PostGIS, Geofencing, ETA, Notifications, Emergency/SOS, and Parent Linking belong to future phases).*
+
 
 SMARTBUS is a modern college campus transportation backend designed to support live bus tracking, passenger safety, parent-child approvals, and emergency handling across four roles: **ADMIN**, **DRIVER**, **STUDENT**, and **PARENT**.
 
@@ -193,13 +194,40 @@ Driver GPS Request
 | `/api/v1/trips/{id}/start` | `POST` | `ADMIN` or Assigned `DRIVER` | Start a scheduled trip |
 | `/api/v1/trips/{id}/end` | `POST` | `ADMIN` or Assigned `DRIVER` | End an in-progress trip & clean live cache |
 | `/api/v1/trips/{id}/cancel` | `POST` | `ADMIN` only | Cancel a scheduled trip & clean live cache |
-| `/api/v1/trips/{trip_id}/gps` | `POST` | Assigned `DRIVER` only | Ingest GPS location telemetry |
+| `/api/v1/trips/{trip_id}/gps` | `POST` | Assigned `DRIVER` only | Ingest single GPS location telemetry |
+| `/api/v1/trips/{trip_id}/gps/sync` | `POST` | Assigned `DRIVER` only | Ingest batch of offline-queued GPS points (1-500) with idempotency |
 | `/api/v1/trips/{trip_id}/gps` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve chronological GPS history |
 | `/api/v1/trips/{trip_id}/live` | `GET` | `ADMIN` or Assigned `DRIVER` | Retrieve latest cached live location |
 | `/api/v1/ws/trips/{trip_id}` | `WebSocket` | `ADMIN` or Assigned `DRIVER` | Realtime live location telemetry stream |
 | `/docs` | `GET` | Public | Interactive Swagger UI documentation |
 | `/redoc` | `GET` | Public | Interactive ReDoc documentation |
 | `/openapi.json` | `GET` | Public | OpenAPI 3.0 schema |
+
+---
+
+## Offline GPS Batch Synchronization (Phase 11)
+
+```text
+Driver Device (Offline)
+       │ (Local Drift/SQLite Queue)
+       ▼
+Network Connectivity Restored
+       │
+       ▼ POST /api/v1/trips/{trip_id}/gps/sync (Batch: 1-500 points)
+FastAPI Backend
+       │
+       ├──► Deduplication against PostgreSQL (LocationPing.client_id UUID)
+       │    & Intra-Batch Deduplication
+       │
+       ├──► PostgreSQL: Bulk insert accepted points with server received_at
+       │
+       └──► Redis & WebSocket: Atomically advance live state only for newest recorded_at
+```
+
+- **Idempotency Guarantee:** Each queued point carries a client-generated UUID `client_id`. If mobile uploads retry due to transient connection dropouts, already inserted points are marked as `duplicates` without failing the batch.
+- **Out-of-Order Handling:** PostgreSQL retains all accepted historical points chronologically, while Redis Lua script guarantees the live pointer moves monotonically forward.
+- **Fault Tolerance:** Temporary Redis outages do not fail or roll back the primary PostgreSQL transaction.
+
 
 ---
 

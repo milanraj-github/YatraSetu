@@ -12,7 +12,12 @@ from app.models.enums import TripStatus, UserRole
 from app.models.location import LocationPing
 from app.models.trip import Trip
 from app.models.user import User
-from app.schemas.gps import LiveLocationResponse, LocationPingCreate
+from app.schemas.gps import (
+    GPSBatchSyncRequest,
+    GPSBatchSyncResponse,
+    LiveLocationResponse,
+    LocationPingCreate,
+)
 from app.services.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -196,6 +201,111 @@ async def ingest_location_ping(
     )
 
     return location_ping
+
+
+async def sync_location_pings_batch(
+    db: AsyncSession,
+    trip_id: uuid.UUID,
+    current_user: User,
+    batch_in: GPSBatchSyncRequest,
+) -> GPSBatchSyncResponse:
+    """Ingest a batch of offline-queued GPS points with client_id deduplication."""
+    # 1. Enforce DRIVER role strictly
+    if current_user.role != UserRole.DRIVER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only authenticated drivers can submit GPS location batches",
+        )
+
+    # 2. Retrieve trip
+    result = await db.execute(select(Trip).where(Trip.id == trip_id))
+    trip = result.scalar_one_or_none()
+    if not trip:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trip not found",
+        )
+
+    # 3. Enforce Driver Ownership and Assigned Bus verification
+    if trip.driver_id != current_user.id or trip.bus_id != current_user.assigned_bus_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: driver is not assigned to operate this trip and bus",
+        )
+
+    # 4. Verify Trip Status (Only IN_PROGRESS trips accept GPS)
+    if trip.status != TripStatus.IN_PROGRESS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot sync GPS for trip with status '{trip.status.value}'. Trip must be IN_PROGRESS.",
+        )
+
+    # 5. Extract client IDs and check for existing records in DB
+    submitted_client_ids = [pt.client_id for pt in batch_in.points]
+    existing_records = await db.execute(
+        select(LocationPing.client_id).where(
+            LocationPing.client_id.in_(submitted_client_ids)
+        )
+    )
+    existing_client_ids = set(existing_records.scalars().all())
+
+    # 6. Deduplicate both against DB and intra-batch duplicates
+    server_received_at = datetime.now(timezone.utc)
+    seen_batch_ids = set()
+    accepted_points = []
+    duplicates_count = 0
+
+    for pt in batch_in.points:
+        if pt.client_id in existing_client_ids or pt.client_id in seen_batch_ids:
+            duplicates_count += 1
+        else:
+            seen_batch_ids.add(pt.client_id)
+            accepted_points.append(pt)
+
+    # 7. Insert accepted pings into DB
+    if accepted_points:
+        new_pings = [
+            LocationPing(
+                trip_id=trip.id,
+                driver_id=current_user.id,
+                client_id=pt.client_id,
+                latitude=pt.latitude,
+                longitude=pt.longitude,
+                recorded_at=pt.recorded_at,
+                received_at=server_received_at,
+                accuracy_meters=pt.accuracy_meters,
+                speed_mps=pt.speed_mps,
+                heading_degrees=pt.heading_degrees,
+            )
+            for pt in accepted_points
+        ]
+        db.add_all(new_pings)
+        await db.commit()
+
+        # 8. Update Redis live location for accepted points
+        # To maintain monotonicity, sort chronologically by recorded_at
+        sorted_accepted = sorted(accepted_points, key=lambda p: p.recorded_at)
+        for pt in sorted_accepted:
+            await update_trip_live_location(
+                trip_id=trip.id,
+                driver_id=current_user.id,
+                bus_id=trip.bus_id,
+                latitude=pt.latitude,
+                longitude=pt.longitude,
+                recorded_at=pt.recorded_at,
+                received_at=server_received_at,
+                accuracy_meters=pt.accuracy_meters,
+                speed_mps=pt.speed_mps,
+                heading_degrees=pt.heading_degrees,
+            )
+
+    return GPSBatchSyncResponse(
+        trip_id=trip.id,
+        total=len(batch_in.points),
+        accepted=len(accepted_points),
+        duplicates=duplicates_count,
+    )
+
 
 
 async def get_trip_location_history(
