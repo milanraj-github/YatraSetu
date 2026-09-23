@@ -61,3 +61,5 @@ npm install
 npm run dev
 ```
 *(Requires `.env` file configured with your backend API URL and Firebase Web credentials)*
+
+.
