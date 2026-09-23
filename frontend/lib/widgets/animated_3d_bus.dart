@@ -56,7 +56,7 @@ class Animated3DBusPainter extends CustomPainter {
 
     // Animated dashed lines along road
     final dashPaint = Paint()
-      ..color = const Color(0xFF38BDF8).withOpacity(0.6)
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.6)
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
 
@@ -78,7 +78,7 @@ class Animated3DBusPainter extends CustomPainter {
   void _drawShadow(Canvas canvas, Offset center) {
     final shadowScale = 1.0 + pulseValue * 0.05;
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5 - pulseValue * 0.1)
+      ..color = Colors.black.withValues(alpha: 0.5 - pulseValue * 0.1)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
 
     final shadowRect = RRect.fromLTRBR(
@@ -93,7 +93,7 @@ class Animated3DBusPainter extends CustomPainter {
 
   void _drawEngineGlow(Canvas canvas, Offset center) {
     final glowPaint = Paint()
-      ..color = const Color(0xFF10B981).withOpacity(0.3 + pulseValue * 0.3)
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.3 + pulseValue * 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25);
 
     canvas.drawCircle(Offset(center.dx + 40, center.dy + 75), 45, glowPaint);
@@ -151,7 +151,7 @@ class Animated3DBusPainter extends CustomPainter {
 
     // 3D Bevel Highlights
     final highlightPaint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
+      ..color = Colors.white.withValues(alpha: 0.3)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
@@ -178,7 +178,7 @@ class Animated3DBusPainter extends CustomPainter {
 
     // Glass Reflection Shininess
     final shinePaint = Paint()
-      ..color = Colors.white.withOpacity(0.6)
+      ..color = Colors.white.withValues(alpha: 0.6)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
@@ -207,8 +207,8 @@ class Animated3DBusPainter extends CustomPainter {
     final beamPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          const Color(0xFFFDE047).withOpacity(0.6 + pulseValue * 0.2),
-          const Color(0xFFFDE047).withOpacity(0.0),
+          const Color(0xFFFDE047).withValues(alpha: 0.6 + pulseValue * 0.2),
+          const Color(0xFFFDE047).withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(center.dx + 110, center.dy + 10, 100, 60));
 

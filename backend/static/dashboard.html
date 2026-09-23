@@ -160,11 +160,11 @@
   <!-- JavaScript App Engine -->
   <script>
     const userTokens = {
-      driver1: { token: 'mock-token-driver1@sode-edu.in', email: 'driver1@sode-edu.in', role: 'DRIVER', name: 'Driver One' },
-      driver2: { token: 'mock-token-driver2@sode-edu.in', email: 'driver2@sode-edu.in', role: 'DRIVER', name: 'Driver Two' },
-      driver3: { token: 'mock-token-driver3@sode-edu.in', email: 'driver3@sode-edu.in', role: 'DRIVER', name: 'Driver Three' },
-      student1: { token: 'mock-token-student1@sode-edu.in', email: 'student1@sode-edu.in', role: 'STUDENT', name: 'Student One' },
-      admin1: { token: 'mock-token-admin1@sode-edu.in', email: 'admin1@sode-edu.in', role: 'ADMIN', name: 'Admin One' }
+      driver1: { token: localStorage.getItem('test_firebase_token') || '', email: 'driver1@sode-edu.in', role: 'DRIVER', name: 'Driver One' },
+      driver2: { token: localStorage.getItem('test_firebase_token') || '', email: 'driver2@sode-edu.in', role: 'DRIVER', name: 'Driver Two' },
+      driver3: { token: localStorage.getItem('test_firebase_token') || '', email: 'driver3@sode-edu.in', role: 'DRIVER', name: 'Driver Three' },
+      student1: { token: localStorage.getItem('test_firebase_token') || '', email: 'student1@sode-edu.in', role: 'STUDENT', name: 'Student One' },
+      admin1: { token: localStorage.getItem('test_firebase_token') || '', email: 'admin1@sode-edu.in', role: 'ADMIN', name: 'Admin One' }
     };
 
     let currentUserKey = 'driver1';

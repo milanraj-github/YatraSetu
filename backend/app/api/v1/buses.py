@@ -12,12 +12,14 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
 from app.schemas.auth import APIResponse
 from app.schemas.management import BusCreate, BusUpdate, BusResponse
 from app.models.bus import Bus, BusStatus
+from app.models.route import Route
 
 logger = logging.getLogger("smartbus.buses")
 router = APIRouter(prefix="/buses", tags=["Buses"])
@@ -29,7 +31,7 @@ async def list_buses(
     _=Depends(get_current_user),
 ):
     """List all buses. Accessible to all authenticated users."""
-    result = await db.execute(select(Bus).order_by(Bus.id))
+    result = await db.execute(select(Bus).options(selectinload(Bus.route)).order_by(Bus.id))
     buses = result.scalars().all()
     return APIResponse(success=True, data=[BusResponse.model_validate(b) for b in buses])
 
@@ -53,15 +55,29 @@ async def create_bus(
             detail={"code": "BUS_ALREADY_EXISTS", "message": "A bus with this bus_number or registration_number already exists."},
         )
 
+    if payload.route_id is not None:
+        route = await db.execute(select(Route).where(Route.id == payload.route_id))
+        if not route.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ROUTE_NOT_FOUND", "message": f"Route with id={payload.route_id} not found."},
+            )
+
     bus = Bus(
         bus_number=payload.bus_number,
         registration_number=payload.registration_number,
         capacity=payload.capacity,
         status=BusStatus.IDLE,
+        route_id=payload.route_id,
     )
     db.add(bus)
     await db.commit()
     await db.refresh(bus)
+    
+    # Reload with relationship
+    result = await db.execute(select(Bus).options(selectinload(Bus.route)).where(Bus.id == bus.id))
+    bus = result.scalars().first()
+    
     logger.info(f"Bus created: {bus.bus_number} (id={bus.id})")
     return APIResponse(success=True, data=BusResponse.model_validate(bus))
 
@@ -73,7 +89,7 @@ async def get_bus(
     _=Depends(get_current_user),
 ):
     """Get a single bus by ID."""
-    result = await db.execute(select(Bus).where(Bus.id == bus_id))
+    result = await db.execute(select(Bus).options(selectinload(Bus.route)).where(Bus.id == bus_id))
     bus = result.scalars().first()
     if not bus:
         raise HTTPException(
@@ -90,14 +106,23 @@ async def update_bus(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_admin),
 ):
-    """Update bus capacity or status. Admin only."""
-    result = await db.execute(select(Bus).where(Bus.id == bus_id))
+    """Update bus details. Admin only."""
+    result = await db.execute(select(Bus).options(selectinload(Bus.route)).where(Bus.id == bus_id))
     bus = result.scalars().first()
     if not bus:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "BUS_NOT_FOUND", "message": f"Bus with id={bus_id} not found."},
         )
+
+    if payload.route_id is not None:
+        route = await db.execute(select(Route).where(Route.id == payload.route_id))
+        if not route.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ROUTE_NOT_FOUND", "message": f"Route with id={payload.route_id} not found."},
+            )
+        bus.route_id = payload.route_id
 
     if payload.capacity is not None:
         bus.capacity = payload.capacity
@@ -106,6 +131,10 @@ async def update_bus(
 
     await db.commit()
     await db.refresh(bus)
+    
+    result = await db.execute(select(Bus).options(selectinload(Bus.route)).where(Bus.id == bus_id))
+    bus = result.scalars().first()
+    
     return APIResponse(success=True, data=BusResponse.model_validate(bus))
 
 
@@ -116,7 +145,7 @@ async def deactivate_bus(
     _=Depends(require_admin),
 ):
     """Mark a bus as INACTIVE (soft delete). Admin only."""
-    result = await db.execute(select(Bus).where(Bus.id == bus_id))
+    result = await db.execute(select(Bus).options(selectinload(Bus.route)).where(Bus.id == bus_id))
     bus = result.scalars().first()
     if not bus:
         raise HTTPException(

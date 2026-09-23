@@ -62,7 +62,10 @@ async def sync_user(
     """
     # Always upsert into DB
     full_name_override = request_data.full_name if request_data else None
-    await _upsert_db_user(db, current_user, full_name_override=full_name_override)
+    db_user = await _upsert_db_user(db, current_user, full_name_override=full_name_override)
+    
+    # Update current_user with DB status
+    current_user.status = db_user.status.value
 
     if current_user.role == UserRole.DRIVER:
         try:
@@ -79,10 +82,17 @@ async def sync_user(
     )
 
 @router.get("/me", response_model=APIResponse[Dict[str, UserResponse]])
-async def get_me(current_user: UserResponse = Depends(get_current_user)):
+async def get_me(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     Retrieves profile and role information for the currently authenticated user.
     """
+    # Fetch DB status
+    stmt = select(User).where(User.email == current_user.email)
+    res = await db.execute(stmt)
+    db_user = res.scalars().first()
+    if db_user:
+        current_user.status = db_user.status.value
+        
     return APIResponse(
         success=True,
         data={"user": current_user}
@@ -118,4 +128,33 @@ async def student_only_test(current_user: UserResponse = Depends(require_student
     return APIResponse(
         success=True,
         data={"message": f"Welcome Student {current_user.full_name}"}
+    )
+
+@router.patch("/me", response_model=APIResponse[Dict[str, UserResponse]])
+async def update_me(
+    payload: UserProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user)
+):
+    from sqlalchemy import select
+    from app.models.user import User
+    
+    stmt = select(User).where(User.firebase_uid == current_user.firebase_uid)
+    res = await db.execute(stmt)
+    db_user = res.scalars().first()
+    
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if payload.full_name is not None:
+        db_user.full_name = payload.full_name.strip()
+    if payload.phone_number is not None:
+        db_user.phone_number = payload.phone_number.strip()
+        
+    await db.commit()
+    await db.refresh(db_user)
+    
+    return APIResponse(
+        success=True,
+        data={"user": UserResponse.model_validate(db_user)}
     )

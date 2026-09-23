@@ -78,7 +78,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2.5),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4)),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4)),
                   ],
                 ),
                 child: const Icon(Icons.directions_bus_rounded, color: Colors.white, size: 28),
@@ -126,7 +126,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withOpacity(0.95),
+                color: const Color(0xFF1E293B).withValues(alpha: 0.95),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFF334155)),
                 boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],

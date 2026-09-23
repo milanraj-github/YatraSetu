@@ -23,12 +23,19 @@ class BusCreate(BaseModel):
     bus_number: str = Field(..., min_length=1, max_length=30, json_schema_extra={"example": "BUS-04"})
     registration_number: str = Field(..., min_length=1, max_length=50, json_schema_extra={"example": "KA-19-AB-1234"})
     capacity: int = Field(default=50, ge=1, le=200)
+    route_id: Optional[int] = None
 
 
 class BusUpdate(BaseModel):
     capacity: Optional[int] = Field(default=None, ge=1, le=200)
     status: Optional[BusStatusEnum] = None
+    route_id: Optional[int] = None
 
+class BusRouteSummary(BaseModel):
+    id: int
+    name: str
+    code: str
+    model_config = ConfigDict(from_attributes=True)
 
 class BusResponse(BaseModel):
     id: int
@@ -36,6 +43,8 @@ class BusResponse(BaseModel):
     registration_number: str
     capacity: int
     status: BusStatusEnum
+    route_id: Optional[int] = None
+    route: Optional[BusRouteSummary] = None
     created_at: datetime
     updated_at: datetime
 
@@ -170,6 +179,10 @@ class ScheduleCreate(BaseModel):
 
 
 class ScheduleUpdate(BaseModel):
+    bus_id: Optional[int] = None
+    route_id: Optional[int] = None
+    direction: Optional[RouteDirectionEnum] = None
+
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     days_of_week: Optional[str] = None

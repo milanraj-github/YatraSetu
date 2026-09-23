@@ -1,0 +1,67 @@
+{"users": [
+{
+  "localId": "KSmKclV21NbyMhdFbc6VNp6rD3l2",
+  "email": "admin1@sode-edu.in",
+  "emailVerified": true,
+  "passwordHash": "ssLlAfxJ47AJrcyr4+wM7P8tdUZ6fRiCEAAOdLkC4y+rozQVZrPraCwcou0th3b7gnJ4rHVBaLlNIiDKcFbB0A==",
+  "salt": "vlMyJZ7kcF2DCA==",
+  "displayName": "Admin One",
+  "createdAt": "1789741528772",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "Q1A9xk5ydkU6QIbfnase4bSAoxn2",
+  "email": "admin3@sode-edu.in",
+  "emailVerified": true,
+  "passwordHash": "k0Q03dE0UkVOwsGYV8ULqLEGdGdC1CutZKbF5iQz6WcQhqWOp57oKqDU1+OZGRsn9rpH/i4N19P6VxkvOC8UDA==",
+  "salt": "shn2fh0wnIF24w==",
+  "displayName": "Admin Three",
+  "createdAt": "1789741531850",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "WfDs8WTQgLeZxcudBjR2LvUWKRW2",
+  "email": "driver2@sode-edu.in",
+  "emailVerified": true,
+  "passwordHash": "Rbg9e1LA6yYczMQKJSDlNP1Mo7GJfW8bMJQcoyxMzF/KcdNx5wb6jQ2Gw2IdUdW6CMrU8xYTaafB3G3VWzC3UA==",
+  "salt": "/hl4AxWmHvyEPg==",
+  "displayName": "Driver Two",
+  "createdAt": "1789741534959",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "mQNCqZ3iIEhN36BfiEn4QTlkplB3",
+  "email": "driver3@sode-edu.in",
+  "emailVerified": true,
+  "passwordHash": "RDxt7iJcMMr0YdyfNdFfE5TlJ9Ou71o5s/GHNy5T/ARDbjMk38vBE6bf7L0pAtGJS6gMrpho4uY+2e16NTDRxg==",
+  "salt": "tqkGo4m0QnFY3A==",
+  "displayName": "Driver Three",
+  "createdAt": "1789741536340",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "nMJMcTemKCMjtvqLjnFLvmyvm153",
+  "email": "driver1@sode-edu.in",
+  "emailVerified": true,
+  "passwordHash": "ZUtgPKn8bALlPOGA7rQ3WRDfEdX/eLlyIDZZ+RlMoqhBkOzgzkdgpxgvjFQCgWeepYx0J3CKm2zvZlzfWQPGzQ==",
+  "salt": "fkUd3h2BYSi1ew==",
+  "displayName": "Driver One",
+  "createdAt": "1789741533516",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "qlmuw8lXp1gxdRQtNAb8AEOhJZD2",
+  "email": "admin2@sode-edu.in",
+  "emailVerified": true,
+  "passwordHash": "GcqI5XqOmD7X/NUy2ZCCCqeDKBARNJHm48G/ECU5StThRENT6oG4SdXWSuqHKN8Gmj7vpZ3icF2mV5e/fwZyUg==",
+  "salt": "19E3tUEVEb2YAA==",
+  "displayName": "Admin Two",
+  "createdAt": "1789741530440",
+  "disabled": false,
+  "providerUserInfo": []
+}]}

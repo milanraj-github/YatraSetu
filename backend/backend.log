@@ -1,0 +1,125 @@
+INFO:     Started server process [32915]
+INFO:     Waiting for application startup.
+2026-09-22 23:01:15,515 - smartbus.main - INFO - Initializing SMARTBUS Backend...
+2026-09-22 23:01:15,573 - smartbus.firebase - INFO - Firebase credentials loaded from file: firebase-service-account.json
+2026-09-22 23:01:15,573 - smartbus.firebase - INFO - Firebase Admin SDK initialized successfully.
+2026-09-22 23:01:15,573 - tzlocal - DEBUG - /etc/localtime found
+2026-09-22 23:01:15,573 - tzlocal - DEBUG - 1 found:
+ {'/etc/localtime is a symlink to': 'Asia/Kolkata'}
+2026-09-22 23:01:15,574 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-09-22 23:01:15,574 - apscheduler.scheduler - INFO - Added job "start_background_scheduler.<locals>.scheduled_job" to job store "default"
+2026-09-22 23:01:15,574 - apscheduler.scheduler - INFO - Scheduler started
+2026-09-22 23:01:15,574 - smartbus.scheduler - INFO - Asia/Kolkata Automatic Session Scheduler started (30s interval).
+2026-09-22 23:01:15,574 - apscheduler.scheduler - DEBUG - Looking for jobs to run
+2026-09-22 23:01:15,574 - apscheduler.scheduler - DEBUG - Next wakeup is due at 2026-09-22 23:01:45.574247+05:30 (in 29.999597 seconds)
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-09-22 23:01:45,574 - apscheduler.scheduler - DEBUG - Looking for jobs to run
+2026-09-22 23:01:45,575 - apscheduler.scheduler - DEBUG - Next wakeup is due at 2026-09-22 23:02:15.574247+05:30 (in 29.998942 seconds)
+2026-09-22 23:01:45,575 - apscheduler.executors.default - INFO - Running job "start_background_scheduler.<locals>.scheduled_job (trigger: interval[0:00:30], next run at: 2026-09-22 23:02:15 IST)" (scheduled at 2026-09-22 23:01:45.574247+05:30)
+2026-09-22 23:01:45,596 - smartbus.scheduler - DEBUG - Evaluating schedules for Asia/Kolkata time: 2026-09-22T23:01:45.596443+05:30 (TUESDAY)
+2026-09-22 23:01:45,604 INFO sqlalchemy.engine.Engine select pg_catalog.version()
+2026-09-22 23:01:45,604 - sqlalchemy.engine.Engine - INFO - select pg_catalog.version()
+2026-09-22 23:01:45,604 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-09-22 23:01:45,604 - sqlalchemy.engine.Engine - INFO - [raw sql] ()
+2026-09-22 23:01:45,605 INFO sqlalchemy.engine.Engine select current_schema()
+2026-09-22 23:01:45,605 - sqlalchemy.engine.Engine - INFO - select current_schema()
+2026-09-22 23:01:45,605 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-09-22 23:01:45,605 - sqlalchemy.engine.Engine - INFO - [raw sql] ()
+2026-09-22 23:01:45,606 INFO sqlalchemy.engine.Engine show standard_conforming_strings
+2026-09-22 23:01:45,606 - sqlalchemy.engine.Engine - INFO - show standard_conforming_strings
+2026-09-22 23:01:45,606 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-09-22 23:01:45,606 - sqlalchemy.engine.Engine - INFO - [raw sql] ()
+2026-09-22 23:01:45,606 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-22 23:01:45,606 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-09-22 23:01:45,620 INFO sqlalchemy.engine.Engine SELECT trip_schedules.id, trip_schedules.bus_id, trip_schedules.route_id, trip_schedules.start_time, trip_schedules.end_time, trip_schedules.direction, trip_schedules.days_of_week, trip_schedules.active, trip_schedules.created_at, trip_schedules.updated_at 
+FROM trip_schedules 
+WHERE trip_schedules.active = true
+2026-09-22 23:01:45,620 - sqlalchemy.engine.Engine - INFO - SELECT trip_schedules.id, trip_schedules.bus_id, trip_schedules.route_id, trip_schedules.start_time, trip_schedules.end_time, trip_schedules.direction, trip_schedules.days_of_week, trip_schedules.active, trip_schedules.created_at, trip_schedules.updated_at 
+FROM trip_schedules 
+WHERE trip_schedules.active = true
+2026-09-22 23:01:45,621 INFO sqlalchemy.engine.Engine [generated in 0.00011s] ()
+2026-09-22 23:01:45,621 - sqlalchemy.engine.Engine - INFO - [generated in 0.00011s] ()
+2026-09-22 23:01:45,634 INFO sqlalchemy.engine.Engine SELECT driver_bus_assignments.id, driver_bus_assignments.driver_id, driver_bus_assignments.bus_id, driver_bus_assignments.assigned_from, driver_bus_assignments.assigned_until, driver_bus_assignments.status, driver_bus_assignments.created_at, driver_bus_assignments.updated_at 
+FROM driver_bus_assignments 
+WHERE driver_bus_assignments.bus_id = $1::INTEGER AND driver_bus_assignments.status = $2::assignmentstatus
+2026-09-22 23:01:45,634 - sqlalchemy.engine.Engine - INFO - SELECT driver_bus_assignments.id, driver_bus_assignments.driver_id, driver_bus_assignments.bus_id, driver_bus_assignments.assigned_from, driver_bus_assignments.assigned_until, driver_bus_assignments.status, driver_bus_assignments.created_at, driver_bus_assignments.updated_at 
+FROM driver_bus_assignments 
+WHERE driver_bus_assignments.bus_id = $1::INTEGER AND driver_bus_assignments.status = $2::assignmentstatus
+2026-09-22 23:01:45,634 INFO sqlalchemy.engine.Engine [generated in 0.00011s] (12, 'ACTIVE')
+2026-09-22 23:01:45,634 - sqlalchemy.engine.Engine - INFO - [generated in 0.00011s] (12, 'ACTIVE')
+2026-09-22 23:01:45,637 INFO sqlalchemy.engine.Engine SELECT tracking_sessions.id, tracking_sessions.bus_id, tracking_sessions.route_id, tracking_sessions.schedule_id, tracking_sessions.driver_id, tracking_sessions.session_date, tracking_sessions.direction, tracking_sessions.status, tracking_sessions.started_at, tracking_sessions.ended_at, tracking_sessions.created_at, tracking_sessions.updated_at 
+FROM tracking_sessions 
+WHERE tracking_sessions.bus_id = $1::INTEGER AND tracking_sessions.session_date = $2::DATE AND tracking_sessions.schedule_id = $3::INTEGER
+2026-09-22 23:01:45,637 - sqlalchemy.engine.Engine - INFO - SELECT tracking_sessions.id, tracking_sessions.bus_id, tracking_sessions.route_id, tracking_sessions.schedule_id, tracking_sessions.driver_id, tracking_sessions.session_date, tracking_sessions.direction, tracking_sessions.status, tracking_sessions.started_at, tracking_sessions.ended_at, tracking_sessions.created_at, tracking_sessions.updated_at 
+FROM tracking_sessions 
+WHERE tracking_sessions.bus_id = $1::INTEGER AND tracking_sessions.session_date = $2::DATE AND tracking_sessions.schedule_id = $3::INTEGER
+2026-09-22 23:01:45,637 INFO sqlalchemy.engine.Engine [generated in 0.00007s] (12, datetime.date(2026, 9, 22), 5)
+2026-09-22 23:01:45,637 - sqlalchemy.engine.Engine - INFO - [generated in 0.00007s] (12, datetime.date(2026, 9, 22), 5)
+2026-09-22 23:01:45,641 INFO sqlalchemy.engine.Engine SELECT buses.id, buses.bus_number, buses.registration_number, buses.capacity, buses.status, buses.route_id, buses.created_at, buses.updated_at 
+FROM buses 
+WHERE buses.id = $1::INTEGER
+2026-09-22 23:01:45,641 - sqlalchemy.engine.Engine - INFO - SELECT buses.id, buses.bus_number, buses.registration_number, buses.capacity, buses.status, buses.route_id, buses.created_at, buses.updated_at 
+FROM buses 
+WHERE buses.id = $1::INTEGER
+2026-09-22 23:01:45,641 INFO sqlalchemy.engine.Engine [generated in 0.00006s] (12,)
+2026-09-22 23:01:45,641 - sqlalchemy.engine.Engine - INFO - [generated in 0.00006s] (12,)
+2026-09-22 23:01:45,645 INFO sqlalchemy.engine.Engine SELECT driver_bus_assignments.id, driver_bus_assignments.driver_id, driver_bus_assignments.bus_id, driver_bus_assignments.assigned_from, driver_bus_assignments.assigned_until, driver_bus_assignments.status, driver_bus_assignments.created_at, driver_bus_assignments.updated_at 
+FROM driver_bus_assignments 
+WHERE driver_bus_assignments.bus_id = $1::INTEGER AND driver_bus_assignments.status = $2::assignmentstatus
+2026-09-22 23:01:45,645 - sqlalchemy.engine.Engine - INFO - SELECT driver_bus_assignments.id, driver_bus_assignments.driver_id, driver_bus_assignments.bus_id, driver_bus_assignments.assigned_from, driver_bus_assignments.assigned_until, driver_bus_assignments.status, driver_bus_assignments.created_at, driver_bus_assignments.updated_at 
+FROM driver_bus_assignments 
+WHERE driver_bus_assignments.bus_id = $1::INTEGER AND driver_bus_assignments.status = $2::assignmentstatus
+2026-09-22 23:01:45,645 INFO sqlalchemy.engine.Engine [cached since 0.01199s ago] (12, 'ACTIVE')
+2026-09-22 23:01:45,645 - sqlalchemy.engine.Engine - INFO - [cached since 0.01199s ago] (12, 'ACTIVE')
+2026-09-22 23:01:45,646 INFO sqlalchemy.engine.Engine SELECT tracking_sessions.id, tracking_sessions.bus_id, tracking_sessions.route_id, tracking_sessions.schedule_id, tracking_sessions.driver_id, tracking_sessions.session_date, tracking_sessions.direction, tracking_sessions.status, tracking_sessions.started_at, tracking_sessions.ended_at, tracking_sessions.created_at, tracking_sessions.updated_at 
+FROM tracking_sessions 
+WHERE tracking_sessions.bus_id = $1::INTEGER AND tracking_sessions.session_date = $2::DATE AND tracking_sessions.schedule_id = $3::INTEGER
+2026-09-22 23:01:45,646 - sqlalchemy.engine.Engine - INFO - SELECT tracking_sessions.id, tracking_sessions.bus_id, tracking_sessions.route_id, tracking_sessions.schedule_id, tracking_sessions.driver_id, tracking_sessions.session_date, tracking_sessions.direction, tracking_sessions.status, tracking_sessions.started_at, tracking_sessions.ended_at, tracking_sessions.created_at, tracking_sessions.updated_at 
+FROM tracking_sessions 
+WHERE tracking_sessions.bus_id = $1::INTEGER AND tracking_sessions.session_date = $2::DATE AND tracking_sessions.schedule_id = $3::INTEGER
+2026-09-22 23:01:45,646 INFO sqlalchemy.engine.Engine [cached since 0.008494s ago] (12, datetime.date(2026, 9, 22), 6)
+2026-09-22 23:01:45,646 - sqlalchemy.engine.Engine - INFO - [cached since 0.008494s ago] (12, datetime.date(2026, 9, 22), 6)
+2026-09-22 23:01:45,646 INFO sqlalchemy.engine.Engine SELECT buses.id, buses.bus_number, buses.registration_number, buses.capacity, buses.status, buses.route_id, buses.created_at, buses.updated_at 
+FROM buses 
+WHERE buses.id = $1::INTEGER
+2026-09-22 23:01:45,646 - sqlalchemy.engine.Engine - INFO - SELECT buses.id, buses.bus_number, buses.registration_number, buses.capacity, buses.status, buses.route_id, buses.created_at, buses.updated_at 
+FROM buses 
+WHERE buses.id = $1::INTEGER
+2026-09-22 23:01:45,646 INFO sqlalchemy.engine.Engine [cached since 0.004874s ago] (12,)
+2026-09-22 23:01:45,646 - sqlalchemy.engine.Engine - INFO - [cached since 0.004874s ago] (12,)
+2026-09-22 23:01:45,647 INFO sqlalchemy.engine.Engine SELECT driver_bus_assignments.id, driver_bus_assignments.driver_id, driver_bus_assignments.bus_id, driver_bus_assignments.assigned_from, driver_bus_assignments.assigned_until, driver_bus_assignments.status, driver_bus_assignments.created_at, driver_bus_assignments.updated_at 
+FROM driver_bus_assignments 
+WHERE driver_bus_assignments.bus_id = $1::INTEGER AND driver_bus_assignments.status = $2::assignmentstatus
+2026-09-22 23:01:45,647 - sqlalchemy.engine.Engine - INFO - SELECT driver_bus_assignments.id, driver_bus_assignments.driver_id, driver_bus_assignments.bus_id, driver_bus_assignments.assigned_from, driver_bus_assignments.assigned_until, driver_bus_assignments.status, driver_bus_assignments.created_at, driver_bus_assignments.updated_at 
+FROM driver_bus_assignments 
+WHERE driver_bus_assignments.bus_id = $1::INTEGER AND driver_bus_assignments.status = $2::assignmentstatus
+2026-09-22 23:01:45,647 INFO sqlalchemy.engine.Engine [cached since 0.01315s ago] (10, 'ACTIVE')
+2026-09-22 23:01:45,647 - sqlalchemy.engine.Engine - INFO - [cached since 0.01315s ago] (10, 'ACTIVE')
+2026-09-22 23:01:45,647 INFO sqlalchemy.engine.Engine SELECT tracking_sessions.id, tracking_sessions.bus_id, tracking_sessions.route_id, tracking_sessions.schedule_id, tracking_sessions.driver_id, tracking_sessions.session_date, tracking_sessions.direction, tracking_sessions.status, tracking_sessions.started_at, tracking_sessions.ended_at, tracking_sessions.created_at, tracking_sessions.updated_at 
+FROM tracking_sessions 
+WHERE tracking_sessions.bus_id = $1::INTEGER AND tracking_sessions.session_date = $2::DATE AND tracking_sessions.schedule_id = $3::INTEGER
+2026-09-22 23:01:45,647 - sqlalchemy.engine.Engine - INFO - SELECT tracking_sessions.id, tracking_sessions.bus_id, tracking_sessions.route_id, tracking_sessions.schedule_id, tracking_sessions.driver_id, tracking_sessions.session_date, tracking_sessions.direction, tracking_sessions.status, tracking_sessions.started_at, tracking_sessions.ended_at, tracking_sessions.created_at, tracking_sessions.updated_at 
+FROM tracking_sessions 
+WHERE tracking_sessions.bus_id = $1::INTEGER AND tracking_sessions.session_date = $2::DATE AND tracking_sessions.schedule_id = $3::INTEGER
+2026-09-22 23:01:45,647 INFO sqlalchemy.engine.Engine [cached since 0.009563s ago] (10, datetime.date(2026, 9, 22), 7)
+2026-09-22 23:01:45,647 - sqlalchemy.engine.Engine - INFO - [cached since 0.009563s ago] (10, datetime.date(2026, 9, 22), 7)
+2026-09-22 23:01:45,647 INFO sqlalchemy.engine.Engine SELECT buses.id, buses.bus_number, buses.registration_number, buses.capacity, buses.status, buses.route_id, buses.created_at, buses.updated_at 
+FROM buses 
+WHERE buses.id = $1::INTEGER
+2026-09-22 23:01:45,647 - sqlalchemy.engine.Engine - INFO - SELECT buses.id, buses.bus_number, buses.registration_number, buses.capacity, buses.status, buses.route_id, buses.created_at, buses.updated_at 
+FROM buses 
+WHERE buses.id = $1::INTEGER
+2026-09-22 23:01:45,647 INFO sqlalchemy.engine.Engine [cached since 0.005868s ago] (10,)
+2026-09-22 23:01:45,647 - sqlalchemy.engine.Engine - INFO - [cached since 0.005868s ago] (10,)
+2026-09-22 23:01:45,648 INFO sqlalchemy.engine.Engine SELECT emergencies.id, emergencies.type, emergencies.severity, emergencies.status, emergencies.bus_id, emergencies.driver_id, emergencies.trip_id, emergencies.route_id, emergencies.latitude, emergencies.longitude, emergencies.accuracy, emergencies.description, emergencies.created_at, emergencies.updated_at, emergencies.acknowledged_at, emergencies.acknowledged_by, emergencies.resolved_at, emergencies.resolved_by 
+FROM emergencies 
+WHERE emergencies.type = $1::emergencytype AND emergencies.status = $2::emergencystatus AND emergencies.created_at <= $3::TIMESTAMP WITH TIME ZONE
+2026-09-22 23:01:45,648 - sqlalchemy.engine.Engine - INFO - SELECT emergencies.id, emergencies.type, emergencies.severity, emergencies.status, emergencies.bus_id, emergencies.driver_id, emergencies.trip_id, emergencies.route_id, emergencies.latitude, emergencies.longitude, emergencies.accuracy, emergencies.description, emergencies.created_at, emergencies.updated_at, emergencies.acknowledged_at, emergencies.acknowledged_by, emergencies.resolved_at, emergencies.resolved_by 
+FROM emergencies 
+WHERE emergencies.type = $1::emergencytype AND emergencies.status = $2::emergencystatus AND emergencies.created_at <= $3::TIMESTAMP WITH TIME ZONE
+2026-09-22 23:01:45,648 INFO sqlalchemy.engine.Engine [generated in 0.00009s] ('AUTOMATIC_ACCIDENT', 'POTENTIAL', datetime.datetime(2026, 9, 22, 17, 31, 15, 647999))
+2026-09-22 23:01:45,648 - sqlalchemy.engine.Engine - INFO - [generated in 0.00009s] ('AUTOMATIC_ACCIDENT', 'POTENTIAL', datetime.datetime(2026, 9, 22, 17, 31, 15, 647999))
+2026-09-22 23:01:45,652 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-22 23:01:45,652 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-09-22 23:01:45,653 - apscheduler.executors.default - INFO - Job "start_background_scheduler.<locals>.scheduled_job (trigger: interval[0:00:30], next run at: 2026-09-22 23:02:15 IST)" executed successfully

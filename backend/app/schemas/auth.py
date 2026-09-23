@@ -14,8 +14,10 @@ class UserResponse(BaseModel):
     firebase_uid: str
     email: EmailStr
     full_name: str
+    phone_number: Optional[str] = None
     role: UserRole
     is_email_verified: bool
+    status: Optional[str] = "ACTIVE" 
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -31,3 +33,13 @@ class APIResponse(BaseModel, Generic[T]):
     success: bool
     data: Optional[T] = None
     error: Optional[APIErrorDetail] = None
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+
+from app.models.parent_student_relationship import RelationshipType
+
+class ParentRequestSchema(BaseModel):
+    student_email: str
+    relationship_type: RelationshipType

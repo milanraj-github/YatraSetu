@@ -216,3 +216,41 @@ async def remove_stop_from_route(route_id: int, route_stop_id: int, db: AsyncSes
     await db.delete(rs)
     await db.commit()
     return APIResponse(success=True, data={"message": "Stop removed from route."})
+
+from pydantic import BaseModel
+class RouteStopReorderInput(BaseModel):
+    route_stop_id: int
+    new_sequence_order: int
+
+@routes_router.put("/{route_id}/stops/reorder", response_model=APIResponse[RouteResponse])
+async def reorder_route_stops(route_id: int, payload: List[RouteStopReorderInput], db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
+    """Reorder stops for a route."""
+    route = await _load_route(db, route_id)
+    
+    # Fetch all stops to update
+    stops_to_update = []
+    for item in payload:
+        rs = await db.execute(select(RouteStop).where(RouteStop.id == item.route_stop_id, RouteStop.route_id == route_id))
+        stop = rs.scalars().first()
+        if not stop:
+            raise HTTPException(status_code=404, detail={"code": "ROUTE_STOP_NOT_FOUND", "message": f"RouteStop id={item.route_stop_id} not found on route {route_id}."})
+        stops_to_update.append((stop, item.new_sequence_order))
+    
+    # Step 1: Negate sequence orders to avoid unique constraint violations during swap
+    for stop, _ in stops_to_update:
+        stop.sequence_order = -stop.id
+    
+    await db.commit()
+    
+    # Step 2: Set the actual new sequence orders
+    for stop, new_seq in stops_to_update:
+        stop.sequence_order = new_seq
+        
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail={"code": "REORDER_FAILED", "message": str(e)})
+        
+    route = await _load_route(db, route_id)
+    return APIResponse(success=True, data=RouteResponse.model_validate(route))

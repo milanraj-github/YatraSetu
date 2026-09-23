@@ -162,8 +162,10 @@ def start_background_scheduler():
         
         async def scheduled_job():
             async with async_session_maker() as db:
+                from app.services.tracking_service import evaluate_expired_accidents
                 try:
                     await evaluate_scheduled_sessions_for_db(db)
+                    await evaluate_expired_accidents(db)
                 except Exception as e:
                     logger.error(f"Error in automatic scheduler job: {e}")
 

@@ -1,0 +1,107 @@
+import re
+
+with open("backend/app/api/v1/parents_me.py", "r") as f:
+    content = f.read()
+
+new_endpoint = """
+from app.api.v1.students import StudentLiveBusResponse, StudentBusResponse
+from app.models.student_assignment import StudentAssignmentStatus
+from app.models.tracking import TrackingSession, SessionStatus
+from app.schemas.location import LocationPointSchema
+from app.core.redis import get_redis_json
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+
+@router.get("/{student_id}/live-bus", response_model=APIResponse)
+async def get_parent_student_live_bus(
+    student_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_parent: UserResponse = Depends(require_parent)
+):
+    \"\"\"
+    Get live bus tracking for a specific authorized student.
+    \"\"\"
+    # 1. Resolve Parent DB Identity
+    stmt = select(User).where(User.email == current_parent.email, User.role == UserRole.PARENT)
+    db_parent = (await db.execute(stmt)).scalars().first()
+    if not db_parent:
+        raise HTTPException(status_code=404, detail="Parent account not found.")
+
+    # 2. Verify Authorized Relationship
+    rel_stmt = select(ParentStudentRelationship).where(
+        ParentStudentRelationship.parent_id == db_parent.id,
+        ParentStudentRelationship.student_id == student_id,
+        ParentStudentRelationship.status == RelationshipStatus.ACTIVE
+    )
+    rel = (await db.execute(rel_stmt)).scalars().first()
+    if not rel:
+        raise HTTPException(status_code=403, detail="You do not have active access to this student.")
+
+    # 3. Fetch Student Bus Assignment
+    assignment_stmt = (
+        select(StudentBusAssignment)
+        .options(selectinload(StudentBusAssignment.bus))
+        .where(StudentBusAssignment.student_id == student_id)
+        .where(StudentBusAssignment.status == StudentAssignmentStatus.ACTIVE)
+        .order_by(StudentBusAssignment.created_at.desc())
+    )
+    assignment = (await db.execute(assignment_stmt)).scalars().first()
+
+    if not assignment or not assignment.bus:
+        return APIResponse(success=True, data=StudentLiveBusResponse(
+            assigned=False, bus=None, trip=None, route=None, direction=None, location=None, tracking_status="UNAVAILABLE", stop_intelligence=None, eta=None
+        ).model_dump())
+
+    bus = assignment.bus
+    bus_resp = StudentBusResponse(
+        id=bus.id, bus_number=bus.bus_number, registration_number=bus.registration_number,
+        capacity=bus.capacity, status=bus.status.value if hasattr(bus.status, 'value') else bus.status
+    )
+
+    # 4. Fetch Active Tracking Session
+    stmt_trip = select(TrackingSession).options(selectinload(TrackingSession.route)).where(
+        TrackingSession.bus_id == bus.id,
+        TrackingSession.status == SessionStatus.ACTIVE
+    )
+    active_trip = (await db.execute(stmt_trip)).scalars().first()
+
+    if not active_trip:
+        return APIResponse(success=True, data=StudentLiveBusResponse(
+            assigned=True, bus=bus_resp, trip=None, route=None, direction=None, location=None, tracking_status="NO_ACTIVE_TRIP", stop_intelligence=None, eta={"status": "NO_ACTIVE_TRIP"}
+        ).model_dump())
+
+    # 5. Fetch Live Redis Data
+    redis_key = f"bus:{bus.id}:latest_location"
+    redis_data = await get_redis_json(redis_key)
+
+    if not redis_data:
+        return APIResponse(success=True, data=StudentLiveBusResponse(
+            assigned=True, bus=bus_resp, 
+            trip={"id": active_trip.id, "status": active_trip.status.value}, 
+            route={"id": active_trip.route.id, "name": active_trip.route.name} if active_trip.route else None,
+            direction=active_trip.direction.value if active_trip.direction else None,
+            location=None, tracking_status="NO_LOCATION", stop_intelligence=None, eta={"status": "NO_LOCATION"}
+        ).model_dump())
+
+    loc = LocationPointSchema(**redis_data)
+    
+    # Staleness check
+    now = datetime.now(timezone.utc).timestamp()
+    recorded = loc.recorded_at.timestamp()
+    is_stale = (now - recorded) > 60  # 60 seconds threshold
+
+    status = "STALE" if is_stale else "LIVE"
+
+    return APIResponse(success=True, data=StudentLiveBusResponse(
+        assigned=True, bus=bus_resp, 
+        trip={"id": active_trip.id, "status": active_trip.status.value}, 
+        route={"id": active_trip.route.id, "name": active_trip.route.name} if active_trip.route else None,
+        direction=active_trip.direction.value if active_trip.direction else None,
+        location=loc, tracking_status=status, stop_intelligence=None, eta={"status": status}
+    ).model_dump())
+"""
+
+content = content + new_endpoint
+
+with open("backend/app/api/v1/parents_me.py", "w") as f:
+    f.write(content)

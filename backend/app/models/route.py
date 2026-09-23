@@ -1,6 +1,7 @@
+from typing import Optional
 import enum
 from datetime import datetime
-from sqlalchemy import String, Float, Integer, DateTime, Enum, ForeignKey, UniqueConstraint, func
+from sqlalchemy import String, Float, Integer, DateTime, Enum, ForeignKey, UniqueConstraint, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -17,6 +18,10 @@ class Route(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # List of {"lat": float, "lng": float}
+    route_geometry: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
 
     stops = relationship("RouteStop", back_populates="route", cascade="all, delete-orphan", order_by="RouteStop.sequence_order")
 
@@ -31,6 +36,10 @@ class BoardingPoint(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # List of {"lat": float, "lng": float}
+    route_geometry: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
 
 class RouteStop(Base):
     __tablename__ = "route_stops"
@@ -43,6 +52,19 @@ class RouteStop(Base):
 
     route = relationship("Route", back_populates="stops")
     boarding_point = relationship("BoardingPoint")
+
+
+    @property
+    def name(self) -> str:
+        return self.boarding_point.name if self.boarding_point else ""
+
+    @property
+    def latitude(self) -> float:
+        return self.boarding_point.latitude if self.boarding_point else 0.0
+
+    @property
+    def longitude(self) -> float:
+        return self.boarding_point.longitude if self.boarding_point else 0.0
 
     __table_args__ = (
         UniqueConstraint("route_id", "sequence_order", "direction", name="uq_route_sequence_direction"),

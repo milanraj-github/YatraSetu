@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     # Domain Restriction
     STUDENT_REQUIRED_DOMAIN: str = "sode-edu.in"
 
+    # Email / SMTP Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: str = "noreply@smartbus.local"
+    SMTP_FROM_NAME: str = "SMARTBUS System"
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+    PARENT_REQUEST_TOKEN_EXPIRY_MINUTES: int = 60
+
     # Timezone
     TIMEZONE: str = "Asia/Kolkata"
 

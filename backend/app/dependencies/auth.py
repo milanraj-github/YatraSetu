@@ -72,3 +72,35 @@ def require_roles(allowed_roles: List[UserRole]) -> Callable:
 require_admin = require_roles([UserRole.ADMIN])
 require_driver = require_roles([UserRole.DRIVER])
 require_student = require_roles([UserRole.STUDENT])
+
+from app.core.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.models.user import User, UserStatus
+
+async def require_parent(
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> UserResponse:
+    if current_user.role != UserRole.PARENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "INSUFFICIENT_PERMISSIONS",
+                "message": f"User role '{current_user.role.value}' is not authorized to access this resource."
+            }
+        )
+    
+    # Verify status from DB
+    stmt = select(User).where(User.email == current_user.email)
+    res = await db.execute(stmt)
+    db_user = res.scalars().first()
+    
+    if not db_user:
+        raise HTTPException(status_code=403, detail={"code": "USER_NOT_FOUND", "message": "Parent account not found. Please complete Parent registration first."})
+        
+    if db_user.status != UserStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail={"code": "ACCOUNT_INACTIVE", "message": "Your Parent account is currently inactive. Please contact the administrator."})
+        
+    return current_user
+

@@ -22,6 +22,7 @@ class User(Base):
     firebase_uid: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False, default=UserRole.STUDENT)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), nullable=False, default=UserStatus.ACTIVE)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

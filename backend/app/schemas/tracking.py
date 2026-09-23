@@ -31,6 +31,7 @@ class BusSummarySchema(BaseModel):
     bus_number: str
     registration_number: str
     status: BusStatus
+    model_config = ConfigDict(from_attributes=True)
 
 class RouteStopSummarySchema(BaseModel):
     id: int
@@ -38,6 +39,7 @@ class RouteStopSummarySchema(BaseModel):
     sequence_order: int
     latitude: float
     longitude: float
+    model_config = ConfigDict(from_attributes=True)
 
 class RouteSummarySchema(BaseModel):
     id: int
@@ -45,12 +47,14 @@ class RouteSummarySchema(BaseModel):
     code: str
     direction: RouteDirection
     stops: List[RouteStopSummarySchema] = []
+    model_config = ConfigDict(from_attributes=True)
 
 class ScheduleSummarySchema(BaseModel):
     id: int
-    start_time: str
-    end_time: str
+    start_time: time
+    end_time: time
     direction: RouteDirection
+    model_config = ConfigDict(from_attributes=True)
 
 class SessionSummarySchema(BaseModel):
     id: int
@@ -58,6 +62,7 @@ class SessionSummarySchema(BaseModel):
     direction: RouteDirection
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
 
 class DriverTrackingStatusResponse(BaseModel):
     tracking_active: bool
@@ -69,18 +74,60 @@ class DriverTrackingStatusResponse(BaseModel):
 class LiveTripResponse(BaseModel):
     trip_id: int
     bus_id: int
+    route_id: Optional[int] = None
+    route_name: Optional[str] = None
+
     bus_number: str
     status: SessionStatus
-    location_status: str  # LIVE, LAST_KNOWN_LOCATION, GPS_NOT_AVAILABLE
+    location_status: str
+    deviation_status: str = "ON_ROUTE"
+    accident_alert_id: int | None = None
+    accident_deadline_at: str | None = None
+    accident_status: str | None = None
+    active_sos_id: int | None = None  # LIVE, LAST_KNOWN_LOCATION, GPS_NOT_AVAILABLE
     location: Optional[LocationPointSchema] = None
 
 class ActiveBusTrackingItem(BaseModel):
     trip_id: int
     bus_id: int
+    route_id: Optional[int] = None
+    route_name: Optional[str] = None
+
     bus_number: str
     registration_number: str
     status: SessionStatus
     direction: RouteDirection
     driver_name: str
-    location_status: str  # LIVE, LAST_KNOWN_LOCATION, GPS_NOT_AVAILABLE
+    location_status: str
+    deviation_status: str = "ON_ROUTE"
+    accident_alert_id: int | None = None
+    accident_deadline_at: str | None = None
+    accident_status: str | None = None
+    active_sos_id: int | None = None  # LIVE, LAST_KNOWN_LOCATION, GPS_NOT_AVAILABLE
     location: Optional[LocationPointSchema] = None
+
+
+class GpsBatchIngestRequest(BaseModel):
+    locations: List[GpsIngestRequest]
+
+class GpsBatchIngestResponse(BaseModel):
+    accepted: int
+    duplicates: int
+    rejected: int
+    failed_points: List[str]  # Just ISO timestamps of failed/rejected points so client can remove or keep
+    synced_points: List[str]  # ISO timestamps of successfully synced or ignored duplicate points
+
+class StopIntelligenceStopSchema(BaseModel):
+    id: int
+    name: str
+    sequence_order: int
+
+class StopIntelligenceResponse(BaseModel):
+    current_stop: Optional[StopIntelligenceStopSchema] = None
+    next_stop: Optional[StopIntelligenceStopSchema] = None
+    status: str
+    deviation_status: str = "ON_ROUTE"
+    accident_alert_id: int | None = None
+    accident_deadline_at: str | None = None
+    accident_status: str | None = None
+    active_sos_id: int | None = None

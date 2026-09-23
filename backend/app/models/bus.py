@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Enum, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, DateTime, Enum, func, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 class BusStatus(str, enum.Enum):
@@ -19,8 +19,12 @@ class Bus(Base):
     capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
     status: Mapped[BusStatus] = mapped_column(Enum(BusStatus), nullable=False, default=BusStatus.IDLE)
     
+    route_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("routes.id", ondelete="SET NULL"), nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    route = relationship("Route", foreign_keys=[route_id])
 
     def __repr__(self) -> str:
         return f"<Bus id={self.id} bus_number='{self.bus_number}' status='{self.status}'>"
